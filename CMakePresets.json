@@ -6,21 +6,8 @@
             "hidden": true,
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/${presetName}",
-            "toolchainFile": "${sourceDir}/cmake/gnu-tools-for-stm32.cmake",
+		    "toolchainFile": "${sourceDir}/cmake/gcc-arm-none-eabi.cmake",
             "cacheVariables": {
-                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-
-                "CMSIS_Dvendor": "STMicroelectronics:13",
-                "CMSIS_Dname": "STM32G431CBT6",
-                "CMSIS_Dcore": "Cortex-M4",
-                "CMSIS_Dtz": "NO_TZ",
-                "CMSIS_Dfpu": "SP_FPU",
-                "CMSIS_Ddsp": "DSP",
-                "CMSIS_Dmve": "NO_MVE",
-                "CMSIS_Dmpu": "MPU",
-                "CMSIS_Dendian": "Little-endian",
-                "CMSIS_Dsecure": "",
-                "CMSIS_Tcompiler": "GCC"
             }
         },
         {
@@ -40,11 +27,6 @@
     ],
     "buildPresets": [
         {
-            "name": "default",
-            "hidden": true,
-            "configurePreset": "default"
-        },
-                {
             "name": "Debug",
             "configurePreset": "Debug"
         },
