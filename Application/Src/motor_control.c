@@ -34,8 +34,11 @@ static const motor_hw_t s_hw[UGV_MOTOR_COUNT] = {
 };
 
 /* TIM1/TIM15 ARR, both configured for the same 20 kHz PWM carrier
- * (Prescaler=0, Period=799 -- see MX_TIM1_Init/MX_TIM15_Init). */
-#define PWM_ARR 799u
+ * (Prescaler=0, Period=8499 at 170 MHz -- see MX_TIM1_Init/MX_TIM15_Init).
+ * MUST be kept in sync with the Period in Core/Src/main.c whenever the
+ * system clock or PWM frequency changes: a stale value here silently
+ * rescales every PWM command (duty = compare/real_ARR). */
+#define PWM_ARR 8499u
 
 typedef struct {
     float    commanded_rpm;
@@ -164,7 +167,7 @@ static void step_one(motor_index_t motor, float dt_s)
     float next_magnitude = (ramp_toward_value < 0.0f) ? -ramp_toward_value : ramp_toward_value;
     bool decelerating = next_magnitude < current_magnitude;
 
-    float rate = (decelerating ? cfg->decel_limit_pwm_per_s : cfg->accel_limit_pwm_per_s);
+    float rate = (decelerating ? cfg->decel_limit_rpm_per_s : cfg->accel_limit_rpm_per_s);
     st->target_rpm = mm_ramp_toward(st->target_rpm, ramp_toward_value, rate * dt_s);
 
     if (in->last_direction == 0 && commanded_direction != 0) {

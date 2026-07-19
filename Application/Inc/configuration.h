@@ -28,8 +28,11 @@ typedef struct {
     float    pwm_dead_zone;        /* 0..1 fraction of max PWM */
     float    pwm_min_effective;    /* 0..1, calibrated minimum to overcome static friction */
     float    max_pwm;              /* 0..1 fraction of TIM ARR */
-    float    accel_limit_pwm_per_s;
-    float    decel_limit_pwm_per_s;
+    float    accel_limit_rpm_per_s; /* ramps target_rpm, per ugv-stm32-firmware
+                                      * SKILL.md's "acceleration limiter -> per-wheel
+                                      * target RPM" command-path stage -- RPM units,
+                                      * not a PWM fraction */
+    float    decel_limit_rpm_per_s;
     uint32_t direction_change_coast_ms;
     uint32_t encoder_counts_per_output_rev; /* TODO: measure per calibration procedure in
                                               * ugv-motor-driver-encoders SKILL.md -- do not

@@ -1,26 +1,45 @@
 #include "configuration.h"
 
-/* Conservative bench-test defaults. None of these have been validated against
- * measured hardware behavior yet -- see ugv-project-plan SKILL.md's
- * unresolved-decisions register (final driver, encoder CPR, stall current).
- * Deliberately capped low (max_pwm, accel/decel) for first-power-on safety;
- * retune once motor0 is validated on the bench. */
+/* Bench-test values. PID/feedforward and the encoder scale are tuned against
+ * measured motor0 behavior (see per-field comments); current sensing is still
+ * uncalibrated -- see ugv-project-plan SKILL.md's unresolved-decisions
+ * register. Accel/decel limits remain bench-conservative. */
 static const ugv_config_t s_config = {
-    .pid_kp                       = 0.02f,
+    .pid_kp                       = 0.002f, /* plant gain ~333 RPM per unit PWM (datasheet
+                                              * no-load at 12 V, confirmed on the bench);
+                                              * the original kp=0.02 gave loop gain >>1 and
+                                              * a hard bang-bang limit cycle */
     .pid_ki                       = 0.01f,
     .pid_kd                       = 0.0f,
-    .integral_clamp               = 0.3f,
-    .feedforward_gain             = 0.0f, /* PI-only until a feed-forward gain is measured */
+    .integral_clamp               = 30.0f, /* clamp is in integral units (RPM*s): max
+                                             * integral authority = ki * clamp = 0.3 PWM.
+                                             * The old 0.3 limited the I-term to 0.003 PWM
+                                             * -- effectively disabled, leaving permanent
+                                             * steady-state error */
+    .feedforward_gain             = 0.003f, /* 1/333 -- nominal duty per RPM; PID only
+                                              * trims the residual */
     .pwm_dead_zone                = 0.05f,
     .pwm_min_effective            = 0.10f,
-    .max_pwm                      = 0.5f,
-    .accel_limit_pwm_per_s        = 1.0f,
-    .decel_limit_pwm_per_s        = 2.0f,
+    .max_pwm                      = 1.0f, /* full authority -- motor0 speed loop
+                                             * validated on the bench at 10/100/250 RPM */
+    .accel_limit_rpm_per_s        = 100.0f, /* bench-conservative: 0->60 RPM in ~0.6s */
+    .decel_limit_rpm_per_s        = 200.0f,
     .direction_change_coast_ms    = 100u,
-    .encoder_counts_per_output_rev = 44u, /* placeholder: 11 PPR x4 quadrature, UNVERIFIED */
+    .encoder_counts_per_output_rev = 2640u, /* MEASURED on the bench (3 duty/speed points
+                                              * against the datasheet 333 RPM no-load
+                                              * curve), not the naive 11PPRx4x30=1320 from
+                                              * the datasheets -- the 22-pole magnetic ring
+                                              * yields 88 counts per motor rev in TI12
+                                              * mode, twice the nominal "11 PPR" figure */
     .command_timeout_ms           = 300u,
     .stall_min_duration_ms        = 500u,
-    .stall_current_threshold_a    = 5.0f,
+    .stall_current_threshold_a    = 50.0f, /* temporarily raised well above the observed
+                                             * ADC noise floor (~0-5A-equivalent) on the
+                                             * still-unwired/uncalibrated R_IS/L_IS current
+                                             * sense -- was spuriously tripping overcurrent
+                                             * and flickering the enable pins. Lower back
+                                             * down once current sensing is actually wired
+                                             * and calibrated. */
     .current_sense_scale_a_per_v  = 10.0f, /* UNVERIFIED placeholder */
 };
 
