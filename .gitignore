@@ -1,2 +1,9 @@
 build
 !.settings
+
+# Eclipse/STM32CubeIDE workspace metadata (created if the IDE is opened here)
+.metadata/
+
+# CubeMX "Generate Report" artifacts
+UGV_Controllers.pdf
+UGV_Controllers.txt
