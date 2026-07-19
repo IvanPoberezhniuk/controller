@@ -10,4 +10,9 @@ void app_main_init(void);
  * timebase_tick_ready() -- returns immediately between ticks. */
 void app_main_run(void);
 
+/* Called from USART2_IRQHandler (Core/Src/stm32g4xx_it.c) on RXNE. Captures
+ * RDR into a ring buffer so console bytes survive control-loop ticks that
+ * run longer than a byte interval; the main loop drains it in poll_uart_rx. */
+void app_main_uart2_rx_isr(void);
+
 #endif /* APPLICATION_APP_MAIN_H */

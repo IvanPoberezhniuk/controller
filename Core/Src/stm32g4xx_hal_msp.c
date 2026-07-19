@@ -568,6 +568,12 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
 
     /* USER CODE BEGIN USART2_MspInit 1 */
 
+    /* RXNE interrupt feeds app_main.c's RX ring buffer -- console RX must
+     * not depend on the main loop polling RDR in time (see poll_uart_rx). */
+    __HAL_UART_ENABLE_IT(huart, UART_IT_RXNE);
+    HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(USART2_IRQn);
+
     /* USER CODE END USART2_MspInit 1 */
 
   }

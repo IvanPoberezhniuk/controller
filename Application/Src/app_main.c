@@ -42,28 +42,53 @@ static void process_command(const char *line)
     }
 }
 
+/* RX must be serviced from the USART2 interrupt, not polled from the main
+ * loop: a control-loop tick can run for several ms (ADC sampling), which is
+ * longer than a whole command line takes to arrive at 115200 baud -- and
+ * once the USART's ORE flag latches, all further bytes are discarded until
+ * it is cleared. The ISR captures bytes into this ring; the main loop only
+ * parses. */
+#define UART_RX_RING_SIZE 64u
+static volatile uint8_t  s_rx_ring[UART_RX_RING_SIZE];
+static volatile uint8_t  s_rx_ring_head;
+static volatile uint8_t  s_rx_ring_tail;
+
+void app_main_uart2_rx_isr(void)
+{
+    uint32_t isr = huart2.Instance->ISR;
+    if (isr & UART_FLAG_RXNE) {
+        uint8_t byte = (uint8_t)(huart2.Instance->RDR & 0xFFu);
+        uint8_t next_head = (uint8_t)((s_rx_ring_head + 1u) % UART_RX_RING_SIZE);
+        if (next_head != s_rx_ring_tail) {
+            s_rx_ring[s_rx_ring_head] = byte;
+            s_rx_ring_head = next_head;
+        }
+    }
+    if (isr & (USART_ISR_ORE | USART_ISR_NE | USART_ISR_FE)) {
+        __HAL_UART_CLEAR_OREFLAG(&huart2);
+        __HAL_UART_CLEAR_NEFLAG(&huart2);
+        __HAL_UART_CLEAR_FEFLAG(&huart2);
+    }
+}
+
 static void poll_uart_rx(void)
 {
-    if (__HAL_UART_GET_FLAG(&huart2, UART_FLAG_RXNE) == RESET) {
-        return;
-    }
+    while (s_rx_ring_tail != s_rx_ring_head) {
+        uint8_t byte = s_rx_ring[s_rx_ring_tail];
+        s_rx_ring_tail = (uint8_t)((s_rx_ring_tail + 1u) % UART_RX_RING_SIZE);
 
-    uint8_t byte = 0;
-    if (HAL_UART_Receive(&huart2, &byte, 1, 0) != HAL_OK) {
-        return;
-    }
-
-    if (byte == '\r' || byte == '\n') {
-        if (s_line_len > 0) {
-            s_line[s_line_len] = '\0';
-            process_command(s_line);
-            s_line_len = 0;
+        if (byte == '\r' || byte == '\n') {
+            if (s_line_len > 0) {
+                s_line[s_line_len] = '\0';
+                process_command(s_line);
+                s_line_len = 0;
+            }
+            continue;
         }
-        return;
-    }
 
-    if (s_line_len < (CMD_LINE_MAX - 1u)) {
-        s_line[s_line_len++] = (char)byte;
+        if (s_line_len < (CMD_LINE_MAX - 1u)) {
+            s_line[s_line_len++] = (char)byte;
+        }
     }
 }
 
@@ -75,10 +100,12 @@ static bool control_loop_healthy(void)
 
 static void print_telemetry(void)
 {
+    static uint32_t s_seq = 0;
     const MotorState *m0 = motor_control_get_state(MOTOR_FRONT);
     char buf[160];
     int len = snprintf(buf, sizeof(buf),
-        "state=%s m0 target=%.1f meas=%.1f pwm=%.2f cur=%.2f enc_ok=%d stall=%d\r\n",
+        "seq=%lu tick=%lu state=%s m0 target=%.1f meas=%.1f pwm=%.2f cur=%.2f enc_ok=%d stall=%d\r\n",
+        (unsigned long)s_seq++, (unsigned long)HAL_GetTick(),
         safety_state_name(safety_get_state()),
         (double)m0->target_rpm, (double)m0->measured_rpm,
         (double)m0->pwm_command, (double)m0->current_a,
