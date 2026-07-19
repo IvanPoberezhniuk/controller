@@ -7,7 +7,12 @@
  * see the ADC pin diagram from the CubeMX session. */
 #define ADC_VREF_V     3.3f
 #define ADC_MAX_COUNT  4095.0f
-#define ADC_POLL_TIMEOUT_MS 10u
+/* 1 ms, not 10 ms: ADC2 ranks 4/5 (CH13/CH17, motor1 L_IS/R_IS on PA5/PA4)
+ * fail HAL_ADC_PollForConversion() on every tick regardless of clock
+ * source/speed (unresolved, see comment below), so a long timeout on them
+ * only stalls the control loop. Still ample headroom for the channels that
+ * work -- real conversions complete in microseconds. */
+#define ADC_POLL_TIMEOUT_MS 1u
 
 static float counts_to_amps(uint32_t raw_counts)
 {
@@ -33,6 +38,13 @@ void current_monitor_sample(void)
         }
         HAL_ADC_Stop(&hadc2);
     }
+    /* Restarting a scan sequence every tick (rather than running it
+     * continuously) can latch ADC_FLAG_OVR (overrun) even when every value
+     * here was actually read out in time -- once set, OVR stays latched
+     * forever and was observed (via SWD) to stall subsequent
+     * HAL_ADC_PollForConversion() calls for seconds at a time. Must be
+     * cleared explicitly; HAL does not do this in polling mode. */
+    __HAL_ADC_CLEAR_FLAG(&hadc2, ADC_FLAG_OVR);
 
     uint32_t adc1_raw = 0u;
     if (HAL_ADC_Start(&hadc1) == HAL_OK) {
@@ -41,8 +53,13 @@ void current_monitor_sample(void)
         }
         HAL_ADC_Stop(&hadc1);
     }
+    __HAL_ADC_CLEAR_FLAG(&hadc1, ADC_FLAG_OVR);
 
-    /* Rank order from MX_ADC2_Init: CH3, CH4, CH12, CH13, CH17. */
+    /* Rank order from MX_ADC2_Init: CH3, CH4, CH12, CH13, CH17. KNOWN
+     * LIMITATION: ranks 4/5 (CH13/CH17, motor1 L_IS/R_IS on PA5/PA4) fail
+     * conversion on every tick while ranks 1-3 and ADC1 never do, so
+     * motor1_lis_a/ris_a are always 0. Unresolved -- possibly an internal
+     * OPAMP/buffer routing quirk of these channels on this package. */
     float motor0_ris_a = counts_to_amps(adc2_raw[0]);
     float motor0_lis_a = counts_to_amps(adc2_raw[1]);
     float motor2_ris_a = counts_to_amps(adc2_raw[2]);
