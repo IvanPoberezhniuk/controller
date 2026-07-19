@@ -16,14 +16,21 @@ as a learning reference after building this project's Milestone 1
 
 | Setting | Value | Why |
 |---|---|---|
-| SYSCLK source | HSI16 (internal 16 MHz RC), no PLL | Simplest starting point — gets the board booting without needing to know the external oscillator situation. No performance need yet to justify the complexity of a PLL config. |
-| AHB/APB1/APB2 prescalers | All ÷1 (undivided) | Keeps every peripheral clock at a known, simple 16 MHz — makes all the timer-period math below straightforward. |
-| LSI | On | Required clock source for the independent watchdog (IWDG) — IWDG cannot run from HSI. |
+| SYSCLK source | HSI16 (internal 16 MHz RC) → PLL → 170 MHz | Raised from the initial no-PLL 16 MHz bring-up clock to the STM32G431's maximum-performance operating point once bring-up was working. PLL path: `/M=4` (16 MHz/4 = 4 MHz PLL input, within the 2.66–16 MHz valid range) → `×N=85` (4 MHz×85 = 340 MHz VCO, within the 96–344 MHz valid range) → `/R=2` (340/2 = 170 MHz SYSCLK). `PLLP`/`PLLQ` also come out at 170 MHz but are currently unused (no ADC-via-PLLP or FDCAN-via-PLLQ configured yet). |
+| Voltage scaling | Range 1 Boost | 170 MHz is only reachable in Boost mode — normal Range 1 tops out at 150 MHz. |
+| Flash latency | 4 wait states | Required at 170 MHz in Range 1 Boost per the reference manual's wait-state table (0 WS up to 34 MHz, ..., 4 WS up to 170 MHz). |
+| AHB/APB1/APB2 prescalers | All ÷1 (undivided) | Keeps every peripheral clock at a single known value (170 MHz) — makes all the timer-period math below straightforward (still one number, just a different one than the original 16 MHz). |
+| LSI | On | Required clock source for the independent watchdog (IWDG) — IWDG cannot run from HSI, and runs at ~32 kHz completely independent of SYSCLK/PLL either way. |
 
 **Why this matters for timer math**: every PWM/timer period calculation in
-this project (`Period = clock / target_frequency − 1`) assumes a 16 MHz
-timer clock. If SYSCLK is ever raised (e.g. via PLL), every `Period` value
-below must be recalculated.
+this project (`Period = clock / target_frequency − 1`) depends on the
+timer's actual input clock. **Raising SYSCLK via CubeMX does not
+retroactively recompute dependent `Period`/`Prescaler` fields** — they're
+stored as raw numbers in the `.ioc`, not formulas, so every clock-derived
+register has to be re-audited by hand after a clock change. This bit the
+project directly: after moving to 170 MHz, TIM1/TIM15's PWM period was
+still the old 16 MHz-derived value (see below) and TIM6's control-loop
+tick was silently running ~10.6x too fast until caught and fixed.
 
 ## TIM1 — motor0 + motor1 PWM
 
@@ -32,11 +39,11 @@ below must be recalculated.
 | Channel1–4 | PWM Generation CH1/CH2/CH3/CH4 | TIM1 is an advanced timer with 4 independent compare channels — enough to cover two motors' RPWM+LPWM (2 channels each) from one timer. CH1/CH2 → motor0 RPWM/LPWM (PA8/PA9); CH3/CH4 → motor1 RPWM/LPWM (PA10/PA11). |
 | Clock Source | Internal Clock | Without this, the timer has no clock at all and won't count — easy to miss because CubeMX will still generate PWM channel config code even with the timer unclocked. |
 | Prescaler | 0 | No division — full 16 MHz timer clock. |
-| Counter Period (ARR) | 799 | `16,000,000 / 20,000 Hz − 1 = 799`. 20 kHz is a common brushed-DC PWM carrier frequency: high enough to be inaudible/efficient, comfortably within the BTS7960 driver's switching range. |
+| Counter Period (ARR) | 8499 | `170,000,000 / 20,000 Hz − 1 = 8499` at the current 170 MHz timer clock. 20 kHz is a common brushed-DC PWM carrier frequency: high enough to be inaudible/efficient, comfortably within the BTS7960 driver's switching range. (Was `799` back when SYSCLK was 16 MHz with no PLL — recomputed after the clock change; the target frequency, 20 kHz, didn't change, only the register value needed to hit it. Bonus of the higher clock: duty-cycle resolution improved from 800 steps to 8500 steps.) |
 
 ## TIM15 — motor2 PWM
 
-Same reasoning as TIM1 (Internal Clock, Prescaler 0, Period 799 → 20 kHz).
+Same reasoning as TIM1 (Internal Clock, Prescaler 0, Period 8499 → 20 kHz).
 TIM15 was used instead of the more "expected" TIM8 because TIM8's default
 channel pins (`PC6`–`PC9`) aren't broken out on this 48-pin package — TIM15
 is a smaller general-purpose timer that *is* available here, with the two
@@ -62,7 +69,7 @@ general-purpose timers convenient for this on one chip.
 |---|---|---|
 | Activated | Yes | TIM6 is a basic timer with no GPIO pins at all — purely an internal time base, used to pace the motor-control loop at a fixed rate rather than an arbitrary `HAL_Delay` loop. |
 | NVIC global interrupt | *(intended, but never actually got enabled)* | The plan was interrupt-driven; in practice the interrupt was never turned on in the `.ioc`, so the firmware polls TIM6's update flag from the main loop instead (`Platform/timebase.c`). Functionally fine for now — still timer-paced, just not interrupt-driven — but worth revisiting later for tighter timing jitter. |
-| Period / Prescaler shown in `.ioc` | Left at CubeMX's default (65535) | The firmware overrides **both** at runtime — `timebase_init()` explicitly calls `__HAL_TIM_SET_PRESCALER(&htim6, 0)` *and* `__HAL_TIM_SET_AUTORELOAD(&htim6, 31999)` for a 500 Hz tick (`16 MHz / 32000 = 500 Hz`) — rather than depending on getting both GUI fields exactly right. Setting only ARR and leaving the `.ioc`'s default prescaler in place would have given a ~131-second tick instead; the code sets prescaler explicitly for exactly this reason. Keeps the control-loop rate a single documented constant in code instead of split between the `.ioc` and firmware. |
+| Period / Prescaler shown in `.ioc` | Left at CubeMX's default (65535) | The firmware overrides **both** at runtime in `Platform/Src/timebase.c` — `timebase_init()` explicitly calls `__HAL_TIM_SET_PRESCALER()` and `__HAL_TIM_SET_AUTORELOAD()` for a 500 Hz tick, rather than depending on getting both GUI fields exactly right. Keeps the control-loop rate a single documented constant in code instead of split between the `.ioc` and firmware. Current values (at the 170 MHz clock): `PSC=169` → `170,000,000/170 = 1,000,000` Hz counter clock, `ARR=1999` → `1,000,000/500 Hz − 1 = 1999`. TIM6 is a 16-bit basic timer (ARR max 65535), so — unlike TIM1/TIM15 above — a real prescaler is now required: `170,000,000/500 = 340,000` no longer fits in ARR alone with `PSC=0`. **This was caught as a real bug**: when SYSCLK moved from 16 MHz to 170 MHz, the old values (`PSC=0`, `ARR=31999`, correct for `16,000,000/32,000=500 Hz`) were left unchanged, silently producing a real tick rate of `170,000,000/32,000 = 5312.5 Hz` — ~10.6x too fast — which then fed a stale `dt_s=1/500` into every PID/ramp calculation in the control loop. Cheap way to sanity-check this in hardware without a scope: `app_main.c` prints a telemetry line every `TIMEBASE_CONTROL_LOOP_HZ/4` ticks (intended ~4 Hz) — at the bug's 5312.5 Hz it printed at ~42.5 Hz instead, visibly wrong on the console. |
 
 ## USART2 — debug console
 
@@ -102,6 +109,16 @@ per rank) rather than DMA — simple and sufficient at this sample rate,
 though a DMA circular buffer would be the natural upgrade if the control
 loop rate increases later.
 
+**Clock note (after the 16 MHz → 170 MHz change):** `ClockPrescaler =
+ADC_CLOCK_SYNC_PCLK_DIV4` means the ADC's synchronous clock is now
+`170,000,000/4 = 42.5 MHz` (was 4 MHz before). This is believed to be
+within the STM32G4's synchronous ADC clock spec but has **not** been
+checked against the datasheet's ADC clock table yet — treat as
+unconfirmed until verified. Separately, real sample time in seconds
+shrinks proportionally at the same `ADC_SAMPLETIME_2CYCLES_5` setting —
+relevant when `current_sense_scale_a_per_v` (still a placeholder) is
+eventually calibrated against real hardware.
+
 ## ADC1 — 1 remaining current-sense channel
 
 | Field | Value | Why |
@@ -139,3 +156,13 @@ disabled independently without cutting power to the other two.
 3. **ADC "Differential" is the CubeMX default for some channel numbers** (IN3, IN12 on this chip) — easy to silently get a wrong reading if not explicitly switched to Single-ended, and differential mode "borrows" the next channel number as its reference input, blocking it from being used independently.
 4. **Multi-channel ADC scan sequences need each Rank's Channel set individually** — leaving it unset after the first Rank causes every Rank to silently reuse the first channel.
 5. **Encoder Mode has three options (TI1 / TI2 / TI1 and TI2)** that all "work" (compile, no CubeMX warning) but only "TI1 and TI2" gives full quadrature resolution — the other two silently halve it.
+6. **Raising SYSCLK in CubeMX (16 MHz → 170 MHz via PLL) does not recompute any dependent `Period`/`Prescaler` field.** Those are stored as raw numbers in the `.ioc`, not formulas re-derived from the clock tree. TIM1/TIM15's PWM period (`799`, a 16 MHz-derived value) and TIM6's hand-rolled control-loop prescaler/ARR (also 16 MHz-derived, and hardcoded a second time in `Platform/Src/timebase.c` rather than in the `.ioc`) were both silently wrong after the clock change until audited and fixed by hand. Rule going forward: after any SYSCLK change, re-derive every timer/ADC value in this document from scratch rather than assuming CubeMX carried them forward correctly — and grep the firmware source for hardcoded clock-frequency literals (e.g. `16000000u`) in addition to checking the `.ioc`.
+
+## Future: FDCAN clock (not configured yet)
+
+`PLLQ` now outputs 170 MHz alongside `PLLR`/`PLLP`, and is available as an
+FDCAN kernel-clock source once the CAN milestone starts. No FDCAN bit-rate
+math has been done yet — when it is, derive it from whichever clock source
+gets selected at that time (likely `PLLQ` or `PCLK1`, both 170 MHz here),
+not from the original 16 MHz assumption this document was first written
+against.
