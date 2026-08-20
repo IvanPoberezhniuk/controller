@@ -3,6 +3,8 @@
 
 #include "driver/gpio.h"
 
+#define UGV_CRSF_BAUD_RATE 420000u
+
 typedef struct {
     gpio_num_t can_tx;
     gpio_num_t can_rx;
@@ -16,6 +18,8 @@ typedef struct {
     gpio_num_t imu_interrupt;
     gpio_num_t gps_tx;
     gpio_num_t gps_rx;
+    gpio_num_t crsf_tx;
+    gpio_num_t crsf_rx;
     gpio_num_t front_light;
     gpio_num_t rear_light;
     gpio_num_t left_indicator;

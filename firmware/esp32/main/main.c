@@ -19,6 +19,8 @@ void app_main(void)
              UGV_CAN_PROTOCOL_VERSION_MINOR);
     ESP_LOGI(TAG, "TWAI TX=%d RX=%d; OLED SDA=%d SCL=%d",
              board->can_tx, board->can_rx, board->oled_sda, board->oled_scl);
+    ESP_LOGI(TAG, "XR4 CRSF TX=%d RX=%d baud=%u",
+             board->crsf_tx, board->crsf_rx, UGV_CRSF_BAUD_RATE);
 
     /* Hardware services are added as independent components. Keeping the
      * initial target minimal makes board and CAN bring-up testable first. */

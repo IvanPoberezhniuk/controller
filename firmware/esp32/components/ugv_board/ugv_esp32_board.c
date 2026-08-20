@@ -1,8 +1,8 @@
 #include "ugv_esp32_board.h"
 
-/* Sixspan ESP32-S3-N16R8. GPIO19/20 remain available for native USB,
- * GPIO43/44 for the programming/debug UART, and GPIO35/36/37 are not used
- * because they are unavailable on the N16R8 module variant. */
+/* Sixspan ESP32-S3-N16R8. GPIO19/20 remain assigned to native USB,
+ * GPIO43/44 to the programming/debug UART, and the flash/PSRAM pins are not
+ * used. GPIO39-42 remain unallocated after adding the XR4 CRSF UART. */
 static const ugv_esp32_board_config_t s_board = {
     .can_tx = GPIO_NUM_17,
     .can_rx = GPIO_NUM_18,
@@ -16,6 +16,8 @@ static const ugv_esp32_board_config_t s_board = {
     .imu_interrupt = GPIO_NUM_7,
     .gps_tx = GPIO_NUM_15,
     .gps_rx = GPIO_NUM_16,
+    .crsf_tx = GPIO_NUM_38,
+    .crsf_rx = GPIO_NUM_21,
     .front_light = GPIO_NUM_10,
     .rear_light = GPIO_NUM_11,
     .left_indicator = GPIO_NUM_12,
