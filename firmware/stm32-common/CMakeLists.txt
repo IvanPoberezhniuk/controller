@@ -15,6 +15,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/current_monitor.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/encoder.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/fault_manager.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/fw_update_service.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/motor_control.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/motor_math.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/safety.c
@@ -23,6 +24,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Src/watchdog.c
     ${CMAKE_SOURCE_DIR}/shared/can/ugv_can_codec.c
     ${CMAKE_SOURCE_DIR}/shared/update/ugv_boot_request_stm32.c
+    ${CMAKE_SOURCE_DIR}/shared/update/ugv_fw_update_protocol.c
 )
 
 # Add include paths

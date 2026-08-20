@@ -12,6 +12,7 @@
 #include "fault_manager.h"
 #include "safety.h"
 #include "configuration.h"
+#include "fw_update_service.h"
 #if defined(UGV_OTA_APP)
 #include "ugv_boot_request_stm32.h"
 #endif
@@ -123,6 +124,7 @@ void app_main_init(void)
     current_monitor_init();
     fault_manager_init();
     safety_init();
+    (void)fw_update_service_init();
 
     char buf[80];
     int len = snprintf(buf, sizeof(buf), "\r\nUGV %s node boot, reset=%s\r\n",
@@ -134,6 +136,7 @@ void app_main_init(void)
 
 void app_main_run(void)
 {
+    fw_update_service_poll();
     poll_uart_rx();
 
     if (!timebase_tick_ready()) {
