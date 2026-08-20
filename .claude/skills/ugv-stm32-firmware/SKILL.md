@@ -119,6 +119,8 @@ typedef struct {
     float pwm_command;
     float current_a;
     float temperature_c;
+    bool current_valid;
+    bool temperature_valid;
 
     float pid_integral;
     float previous_error;

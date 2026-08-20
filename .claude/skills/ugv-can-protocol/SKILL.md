@@ -31,9 +31,9 @@ arm, turret, suspension controller, detachable wheel modules, sensor module.
 
 ## Command principles
 
-Every motion command should contain: command sequence counter, drive mode,
-enable state, left/right targets or six individual wheel targets,
-emergency-stop status, flags, optional command timestamp/age.
+The motion command contains a sequence counter, drive-mode flags, signed
+left/right RPM targets, and a percentage limit. Enable/emergency stop uses a
+separate frame. Individual six-wheel targets remain an unresolved encoding.
 
 Motor nodes must reject: malformed frames, invalid length, invalid mode,
 impossible target values, stale counters, out-of-range values.
@@ -51,8 +51,8 @@ impossible target values, stale counters, out-of-range values.
 0x190 — left-node fault report
 0x191 — right-node fault report
 
-0x1A0 — left-node temperatures/current
-0x1A1 — right-node temperatures/current
+0x1A0 — left-node temperatures + validity mask
+0x1A1 — right-node temperatures + validity mask
 
 0x710 / 0x711 — left/right STM32 heartbeat
 0x720 — Raspberry Pi gateway heartbeat
@@ -64,10 +64,10 @@ Example vehicle command payload:
 ```text
 Byte 0: sequence counter
 Byte 1: mode and flags
-Byte 2-3: signed left target
-Byte 4-5: signed right target
-Byte 6: speed or torque limit
-Byte 7: checksum or reserved field
+Byte 2-3: signed left target RPM
+Byte 4-5: signed right target RPM
+Byte 6: command limit, 0-100 percent
+Byte 7: reserved
 ```
 
 `shared/can/ugv_can_protocol.h` is the wire contract shared by STM32 firmware,
