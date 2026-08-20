@@ -37,6 +37,14 @@ try {
         "Tests/can/test_can_codec.c", "shared/can/ugv_can_codec.c"
     )
 
+    Build-And-Run "test_fw_update_protocol" @(
+        "-std=c11", "-Wall", "-Wextra", "-Werror",
+        "-Ishared/can", "-Ishared/update",
+        "Tests/update/test_fw_update_protocol.c",
+        "shared/update/ugv_fw_update_protocol.c",
+        "shared/update/ugv_crc32.c"
+    )
+
     $stm32TestIncludes = @(
         "-std=c11", "-Wall", "-Wextra", "-Werror", "-DUGV_NODE_ROLE_LEFT",
         "-ITests/stm32/fakes", "-Ifirmware/stm32-common/Application/Inc",
