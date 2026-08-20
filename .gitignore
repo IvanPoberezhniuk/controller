@@ -1,5 +1,7 @@
 /build/
 !.settings
+__pycache__/
+*.py[cod]
 
 # Eclipse/STM32CubeIDE workspace metadata (created if the IDE is opened here)
 .metadata/

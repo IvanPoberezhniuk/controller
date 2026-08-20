@@ -77,6 +77,15 @@ try {
         "firmware/stm32-common/Application/Src/fault_manager.c"
     ))
 
+    $python = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $python) {
+        throw "Python is required to run the Raspberry Pi updater tests."
+    }
+    & $python.Source "Tests/update/test_can_updater.py"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Python CAN updater tests failed."
+    }
+
     & (Join-Path $repoRoot "Tests\can\test_dbc_sync.ps1")
     Write-Host "All host tests passed." -ForegroundColor Green
 } finally {
