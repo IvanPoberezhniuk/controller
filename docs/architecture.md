@@ -35,6 +35,27 @@ Every CAN node has its own external transceiver. The two STM32 nodes close
 their own speed-control and safety loops. The ESP32 chooses the active command
 source but never performs motor PID control.
 
+## STM32 boot and update path
+
+Each STM32 has a role-specific custom bootloader at `0x08000000` and an OTA
+application at `0x08006000`. Raspberry Pi sends the update over the same
+500 kbit/s CAN trunk. The running motor application accepts `ENTER` only from
+a safe disabled/fault/estop state, disables all motor outputs, and resets into
+the bootloader.
+
+The bootloader invalidates application metadata before erasing any application
+page. It writes sequenced six-byte CAN chunks, verifies the complete image
+CRC-32 and vector table, then commits the metadata magic last. A power failure
+during transfer therefore leaves the STM32 in CAN recovery instead of booting
+a partial program. There is one application slot, so this is safe recovery but
+not A/B rollback.
+
+A blank MCU needs the custom bootloader installed once through the factory ROM
+USART2 interface on PA2/PA3 with BOOT0/PB8. The STM32G431 ROM bootloader does
+not expose FDCAN. After that first provisioning, ST-Link and UART are not
+needed for normal application updates. See
+[`firmware-update.md`](firmware-update.md).
+
 ## Control authority
 
 Only the ESP32 may publish the final `VehicleMotion` (`0x100`) and
@@ -108,8 +129,14 @@ reported GPS interference when RF and GNSS hardware are placed close together.
 
 ## Current implementation boundary
 
-The repository now defines the final pin allocation and CAN wire contract for
-this topology. CRSF parsing, ESP32 command arbitration, TWAI transport, and the
-STM32 FDCAN transport are separate bring-up milestones and are not yet claimed
-as hardware-tested. Until those transports are implemented, the STM32 debug
-UART remains the bench command interface.
+The CAN update protocol, STM32 bootloader, flash validation/recovery logic,
+application-to-bootloader handoff, and Raspberry Pi SocketCAN uploader are
+implemented and host-tested, but not yet validated on assembled hardware. The
+checked-in CubeMX project still has the legacy pinout; its manual FDCAN/TIM16/
+MUX migration is documented separately.
+
+The application-side FDCAN code currently owns only the update-entry filter.
+The normal STM32 motion-command and telemetry dispatcher, ESP32 CRSF parsing,
+ESP32 arbitration, and ESP32 TWAI transport remain separate milestones. Until
+those transports are finished and hardware-tested, USART2 remains the motor
+node bench command interface.
