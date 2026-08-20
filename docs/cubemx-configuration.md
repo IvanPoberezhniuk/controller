@@ -91,7 +91,13 @@ external CAN transceiver hardware is selected).
 | Prescaler | ÷4 | Divides the ~32 kHz LSI clock down to ~8 kHz for the watchdog counter. |
 | Reload / Window | 4095 / 4095 | Reload=4095 gives roughly a 512 ms timeout (`4096 / 8000 Hz`). Window=4095 (== Reload) disables window-mode early-refresh protection — simplest safe starting point; window mode can be added later if premature-refresh bugs become a concern. |
 
-## ADC2 — 5 of the 6 current-sense channels
+## Legacy generated state: ADC2 direct current-sense channels
+
+The following section documents what is still present in `UGV_MotorNode.ioc`,
+not the final multiplexer architecture. Do not enable
+`UGV_MUX_GPIO_CONFIGURED` while ADC2 is configured as this five-rank scan.
+The final manual CubeMX edit will replace these pins with one `MUX_SIG` ADC
+input plus four S0-S3 GPIO outputs.
 
 | Field | Value | Why |
 |---|---|---|
@@ -119,7 +125,10 @@ shrinks proportionally at the same `ADC_SAMPLETIME_2CYCLES_5` setting —
 relevant when `current_sense_scale_a_per_v` (still a placeholder) is
 eventually calibrated against real hardware.
 
-## ADC1 — 1 remaining current-sense channel
+## Legacy generated state: ADC1 remaining direct channel
+
+ADC1 becomes unnecessary for motor-current acquisition after the manual MUX
+pin assignment is complete.
 
 | Field | Value | Why |
 |---|---|---|

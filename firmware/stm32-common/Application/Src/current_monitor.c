@@ -9,13 +9,10 @@
 #define ADC_MAX_COUNT  4095.0f
 #define ADC_POLL_TIMEOUT_MS 1u
 
-/* All motor current-sense lines go through a CD74HC4067 16-channel analog
- * mux into a single ADC2 input (MUX_SIG) instead of one ADC pin per signal.
- * This replaced the old direct-wired layout that split across ADC1/ADC2 and
- * had two ranks (CH13/CH17, motor1 L_IS/R_IS) that never raised EOC -- see
- * memory [[fdcan-pin-conflict]]. Channels 6-15 are reserved on the mux for
- * future motor-temperature/supply-voltage sensing but not sampled yet: no
- * temperature sensor is chosen (MotorState.temperature_c stays unwired). */
+/* The intended hardware routes all current-sense lines through one local
+ * CD74HC4067 into a single MUX_SIG ADC input. Channels 0-5 are R_IS/L_IS;
+ * channels 6-8 are reserved for the three motor temperatures. Temperature
+ * acquisition is not implemented until the sensor type is selected. */
 /* CD74HC4067 channel-select settle time: on-resistance (~100 ohm typical)
  * charging the ADC sample-and-hold plus stray capacitance on the shared SIG
  * trace. A few microseconds of margin costs nothing against the 2 ms

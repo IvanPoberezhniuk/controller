@@ -35,7 +35,7 @@ the codec defines byte order and payload length explicitly.
 ## Hardware responsibility boundaries
 
 - STM32 nodes own motor PWM/enables, quadrature encoders, local current and
-  temperature sampling, command timeout, controlled stop, and driver disable.
+  temperature sampling, command timeout, target reset, and driver disable.
 - ESP32 owns the local display/control panel, IMU, light sensor, GPS, low-power
   lighting outputs, and warning buzzer.
 - Raspberry Pi owns the IMX708 camera, full speaker/audio path, navigation,

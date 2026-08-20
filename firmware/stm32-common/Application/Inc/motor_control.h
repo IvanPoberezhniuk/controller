@@ -10,7 +10,7 @@ typedef enum {
     MOTOR_REAR   = 2,
 } motor_index_t;
 
-/* Per-wheel state, exactly as specified in ugv-stm32-firmware SKILL.md. */
+/* Runtime state for one wheel and its local safety signals. */
 typedef struct {
     int32_t encoder_count;
     int32_t encoder_delta;

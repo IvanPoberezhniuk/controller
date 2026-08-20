@@ -25,9 +25,8 @@ static const int32_t s_count_sign[UGV_MOTOR_COUNT] = {
 };
 
 /* Consecutive zero-delta ticks while the motor is actively commanded before
- * the encoder is considered disconnected/frozen, per
- * ugv-motor-driver-encoders SKILL.md. 250 ticks at the 500 Hz control rate
- * is 500 ms. */
+ * the encoder is considered disconnected/frozen. At 500 Hz, 250 ticks is
+ * 500 ms. */
 #define ENCODER_STALL_TICKS 250u
 
 /* Speed is computed from the summed delta over this many control ticks, not

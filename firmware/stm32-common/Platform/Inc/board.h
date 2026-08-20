@@ -25,9 +25,8 @@ extern IWDG_HandleTypeDef hiwdg;
 #define MOTOR2_R_EN_REAL_GPIO_Port GPIOB
 #define MOTOR2_R_EN_REAL_Pin       GPIO_PIN_10
 
-/* Reset reason, decoded once at boot in board_init() before HAL clears the
- * RCC reset flags -- safety.c/telemetry need this per
- * ugv-telemetry-safety SKILL.md ("publish reset reason"). */
+/* Reset reason, decoded once at boot before HAL clears the RCC reset flags so
+ * telemetry can report why the node restarted. */
 typedef enum {
     BOARD_RESET_UNKNOWN = 0,
     BOARD_RESET_POWER_ON, /* brown-out reset -- STM32G4 has no separate POR flag */

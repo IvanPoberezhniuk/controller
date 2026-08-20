@@ -15,3 +15,5 @@ Logical motors:
 The local CD74HC4067 maps R_IS/L_IS for the three motors to channels 0-5 and
 the three motor-temperature inputs to channels 6-8. Motor and encoder signs
 remain neutral defaults until verified on the assembled right drivetrain.
+Final S0-S3, SIG, and FDCAN pins must be assigned in CubeMX before
+current/CAN hardware bring-up.

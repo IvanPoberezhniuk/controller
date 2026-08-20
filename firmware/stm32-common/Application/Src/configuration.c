@@ -1,9 +1,8 @@
 #include "configuration.h"
 
 /* Bench-test values. PID/feedforward and the encoder scale are tuned against
- * measured motor0 behavior (see per-field comments); current sensing is still
- * uncalibrated -- see ugv-project-plan SKILL.md's unresolved-decisions
- * register. Accel/decel limits remain bench-conservative. */
+ * measured motor0 behavior; current sensing remains uncalibrated. Accel/decel
+ * limits remain bench-conservative. */
 static const ugv_config_t s_config = {
     .pid_kp                       = 0.002f, /* plant gain ~333 RPM per unit PWM (datasheet
                                               * no-load at 12 V, confirmed on the bench);

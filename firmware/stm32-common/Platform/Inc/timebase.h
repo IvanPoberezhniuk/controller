@@ -14,9 +14,8 @@
  *
  * TIM6's NVIC interrupt was not enabled in CubeMX, so this is polled from
  * the main loop via timebase_tick_ready() rather than interrupt-driven.
- * Still timer-paced, not an arbitrary HAL_Delay loop, per
- * ugv-stm32-firmware SKILL.md; can be upgraded to HAL_TIM_Base_Start_IT
- * later if tighter jitter is needed. */
+ * Still timer-paced rather than delayed from the superloop; it can move to a
+ * timer interrupt later if tighter jitter is needed. */
 void timebase_init(void);
 
 /* True once per control-loop period; clears the underlying hardware flag.

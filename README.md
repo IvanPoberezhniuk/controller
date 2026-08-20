@@ -68,9 +68,9 @@ Peripheral drivers are added independently after hardware validation.
 ## Current bring-up status
 
 The STM32 motor firmware is still at motor-node bring-up stage. FDCAN is not
-yet enabled in CubeMX. Current monitoring is being migrated to the local
-CD74HC4067 and its final GPIO/ADC pin assignment still has to be committed to
-the `.ioc` before that module can build and run on hardware.
+yet enabled in CubeMX. The CD74HC4067 sampling code and logical channel map are
+ready, but sensing remains a safe no-op until its GPIO/ADC assignment is added
+manually to the `.ioc` and `UGV_MUX_GPIO_CONFIGURED` is enabled.
 
 See [architecture](docs/architecture.md), [CAN protocol](docs/can-protocol.md),
 and the node pinout documents under `docs/`.
