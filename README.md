@@ -86,5 +86,6 @@ yet enabled in CubeMX. The CD74HC4067 sampling code and logical channel map are
 ready, but sensing remains a safe no-op until its GPIO/ADC assignment is added
 manually to the `.ioc` and `UGV_MUX_GPIO_CONFIGURED` is enabled.
 
-See [architecture](docs/architecture.md), [CAN protocol](docs/can-protocol.md),
-and the node pinout documents under `docs/`.
+See [architecture](docs/architecture.md), [wiring and wire colors](docs/wiring.md),
+[CAN protocol](docs/can-protocol.md), and the node pinout documents under
+`docs/`.

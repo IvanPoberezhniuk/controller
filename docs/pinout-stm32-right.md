@@ -17,3 +17,5 @@ the three motor-temperature inputs to channels 6-8. Motor and encoder signs
 remain neutral defaults until verified on the assembled right drivetrain.
 Final S0-S3, SIG, and FDCAN pins must be assigned in CubeMX before
 current/CAN hardware bring-up.
+See `docs/wiring.md` for the shared motor/encoder pin table, multiplexer
+channels, connector colors, and the signals that remain `TBD CubeMX`.

@@ -15,3 +15,5 @@ Logical motors:
 The local CD74HC4067 maps R_IS/L_IS for the three motors to channels 0-5 and
 the three motor-temperature inputs to channels 6-8. Final S0-S3, SIG, and
 FDCAN pins must be assigned in CubeMX before current/CAN hardware bring-up.
+See `docs/wiring.md` for the shared motor/encoder pin table, multiplexer
+channels, connector colors, and the signals that remain `TBD CubeMX`.
