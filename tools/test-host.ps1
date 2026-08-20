@@ -54,6 +54,14 @@ try {
         "shared/update/ugv_crc32.c"
     )
 
+    Build-And-Run "test_image_metadata" @(
+        "-std=c11", "-Wall", "-Wextra", "-Werror",
+        "-Ishared/can", "-Ishared/update",
+        "Tests/update/test_image_metadata.c",
+        "shared/update/ugv_image_metadata.c",
+        "shared/update/ugv_crc32.c"
+    )
+
     $stm32TestIncludes = @(
         "-std=c11", "-Wall", "-Wextra", "-Werror", "-DUGV_NODE_ROLE_LEFT",
         "-ITests/stm32/fakes", "-Ifirmware/stm32-common/Application/Inc",
