@@ -37,4 +37,20 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     UGV_NODE_ROLE_${UGV_NODE_ROLE_UPPER}
 )
 
+if(UGV_LINKER_LAYOUT STREQUAL "OTA_APP")
+    # SystemInit relocates VTOR even when the application is launched directly
+    # under a debugger rather than through the bootloader jump path.
+    target_compile_definitions(stm32cubemx INTERFACE
+        USER_VECT_TAB_ADDRESS
+        VECT_TAB_OFFSET=0x00006000U
+    )
+endif()
+
 target_link_libraries(${CMAKE_PROJECT_NAME} stm32cubemx)
+
+add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_OBJCOPY} -O binary
+            $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
+            $<TARGET_FILE_DIR:${CMAKE_PROJECT_NAME}>/${CMAKE_PROJECT_NAME}.bin
+    COMMENT "Generating raw firmware image ${CMAKE_PROJECT_NAME}.bin"
+)

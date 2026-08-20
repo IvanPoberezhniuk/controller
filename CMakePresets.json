@@ -39,6 +39,24 @@
                 "CMAKE_BUILD_TYPE": "Release",
                 "UGV_NODE_ROLE": "RIGHT"
             }
+        },
+        {
+            "name": "stm32-left-ota-release",
+            "inherits": "stm32-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "UGV_NODE_ROLE": "LEFT",
+                "UGV_LINKER_LAYOUT": "OTA_APP"
+            }
+        },
+        {
+            "name": "stm32-right-ota-release",
+            "inherits": "stm32-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "UGV_NODE_ROLE": "RIGHT",
+                "UGV_LINKER_LAYOUT": "OTA_APP"
+            }
         }
     ],
     "buildPresets": [
@@ -57,6 +75,14 @@
         {
             "name": "stm32-right-release",
             "configurePreset": "stm32-right-release"
+        },
+        {
+            "name": "stm32-left-ota-release",
+            "configurePreset": "stm32-left-ota-release"
+        },
+        {
+            "name": "stm32-right-ota-release",
+            "configurePreset": "stm32-right-ota-release"
         }
     ]
 }
