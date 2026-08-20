@@ -1,22 +1,35 @@
 #include "timebase.h"
 #include "board.h"
 
-/* htim6 clock = 170 MHz (HSI16 -> PLL /4 x85 /2, APB1 prescaler = 1 ->
- * timer clock = APB1 clock, not doubled). TIM6 is a 16-bit basic timer
- * (ARR max 65535), so 170,000,000 / 500 Hz = 340,000 counts no longer
- * fits with no prescaler -- PSC=169 divides down to an even 1 MHz counter
- * clock first, then ARR = clock / rate - 1 as before. */
-#define TIMEBASE_TIM6_CLOCK_HZ 170000000u
-#define TIMEBASE_PSC 169u
-#define TIMEBASE_COUNTER_CLOCK_HZ ((TIMEBASE_TIM6_CLOCK_HZ) / (TIMEBASE_PSC + 1u))
-#define TIMEBASE_ARR ((TIMEBASE_COUNTER_CLOCK_HZ / TIMEBASE_CONTROL_LOOP_HZ) - 1u)
-
 static const float s_dt_s = 1.0f / (float)TIMEBASE_CONTROL_LOOP_HZ;
+
+static uint32_t tim6_input_clock_hz(void)
+{
+    RCC_ClkInitTypeDef clocks = {0};
+    uint32_t flash_latency = 0u;
+    HAL_RCC_GetClockConfig(&clocks, &flash_latency);
+
+    uint32_t pclk1_hz = HAL_RCC_GetPCLK1Freq();
+    return (clocks.APB1CLKDivider == RCC_HCLK_DIV1) ? pclk1_hz : (pclk1_hz * 2u);
+}
 
 void timebase_init(void)
 {
-    __HAL_TIM_SET_PRESCALER(&htim6, TIMEBASE_PSC);
-    __HAL_TIM_SET_AUTORELOAD(&htim6, TIMEBASE_ARR);
+    uint32_t timer_hz = tim6_input_clock_hz();
+    uint64_t max_period_hz =
+        (uint64_t)TIMEBASE_CONTROL_LOOP_HZ * ((uint64_t)UINT16_MAX + 1u);
+    uint32_t prescaler_div =
+        (uint32_t)(((uint64_t)timer_hz + max_period_hz - 1u) / max_period_hz);
+    if (prescaler_div == 0u) {
+        prescaler_div = 1u;
+    }
+
+    uint32_t counter_hz = timer_hz / prescaler_div;
+    uint32_t period_counts =
+        (counter_hz + (TIMEBASE_CONTROL_LOOP_HZ / 2u)) / TIMEBASE_CONTROL_LOOP_HZ;
+
+    __HAL_TIM_SET_PRESCALER(&htim6, prescaler_div - 1u);
+    __HAL_TIM_SET_AUTORELOAD(&htim6, period_counts - 1u);
     __HAL_TIM_SET_COUNTER(&htim6, 0u);
     __HAL_TIM_CLEAR_FLAG(&htim6, TIM_FLAG_UPDATE);
     HAL_TIM_Base_Start(&htim6);

@@ -39,13 +39,6 @@ static const int8_t s_drive_sign[UGV_MOTOR_COUNT] = {
     [MOTOR_REAR]   = UGV_MOTOR_REAR_DIRECTION,
 };
 
-/* TIM1/TIM15 ARR, both configured for the same 20 kHz PWM carrier
- * (Prescaler=0, Period=8499 at 170 MHz -- see MX_TIM1_Init/MX_TIM15_Init).
- * MUST be kept in sync with the Period in Core/Src/main.c whenever the
- * system clock or PWM frequency changes: a stale value here silently
- * rescales every PWM command (duty = compare/real_ARR). */
-#define PWM_ARR 8499u
-
 typedef struct {
     float    commanded_rpm;
     int8_t   last_direction; /* -1, 0, +1 */
@@ -60,10 +53,11 @@ static void hw_write_pwm(motor_index_t motor, float pwm_command)
     const motor_hw_t *hw = &s_hw[motor];
     float hardware_command = pwm_command * (float)s_drive_sign[motor];
     float magnitude = (hardware_command < 0.0f) ? -hardware_command : hardware_command;
-    uint32_t compare = (uint32_t)(magnitude * (float)PWM_ARR);
+    uint32_t period = __HAL_TIM_GET_AUTORELOAD(hw->pwm_timer);
+    uint32_t compare = (uint32_t)(magnitude * (float)period);
 
-    if (compare > PWM_ARR) {
-        compare = PWM_ARR;
+    if (compare > period) {
+        compare = period;
     }
 
     if (hardware_command > 0.0f) {
