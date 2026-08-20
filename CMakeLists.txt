@@ -1,84 +1,30 @@
 cmake_minimum_required(VERSION 3.22)
 
-#
-# This file is generated only once,
-# and is not re-generated if converter is called multiple times.
-#
-# User is free to modify the file as much as necessary
-#
-
-# Setup compiler settings
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 
-
-# Define the build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
-# Both G431 nodes run identical source; role selects at build time.
-set(UGV_NODE_ROLE "LEFT" CACHE STRING "UGV node role: LEFT or RIGHT")
+set(UGV_NODE_ROLE "LEFT" CACHE STRING "STM32 motor-node role: LEFT or RIGHT")
 set_property(CACHE UGV_NODE_ROLE PROPERTY STRINGS LEFT RIGHT)
+string(TOUPPER "${UGV_NODE_ROLE}" UGV_NODE_ROLE_UPPER)
+string(TOLOWER "${UGV_NODE_ROLE}" UGV_NODE_ROLE_LOWER)
 
-# Set the project name
-set(CMAKE_PROJECT_NAME UGV_Controllers)
+if(NOT UGV_NODE_ROLE_UPPER STREQUAL "LEFT" AND
+   NOT UGV_NODE_ROLE_UPPER STREQUAL "RIGHT")
+    message(FATAL_ERROR "UGV_NODE_ROLE must be LEFT or RIGHT")
+endif()
 
-# Enable compile command to ease indexing with e.g. clangd
+set(CMAKE_PROJECT_NAME "UGV_STM32_${UGV_NODE_ROLE_UPPER}")
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
-# Core project settings
 project(${CMAKE_PROJECT_NAME})
-message("Build type: " ${CMAKE_BUILD_TYPE})
-
-# Enable CMake support for ASM and C languages
 enable_language(C ASM)
 
-# Create an executable object type
-add_executable(${CMAKE_PROJECT_NAME})
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "STM32 motor node: ${UGV_NODE_ROLE_UPPER}")
 
-# Add STM32CubeMX generated sources
-add_subdirectory(cmake/stm32cubemx)
-
-# Link directories setup
-target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined library search paths
-)
-
-# Add sources to executable
-target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    Application/Src/app_main.c
-    Application/Src/configuration.c
-    Application/Src/current_monitor.c
-    Application/Src/encoder.c
-    Application/Src/fault_manager.c
-    Application/Src/motor_control.c
-    Application/Src/motor_math.c
-    Application/Src/safety.c
-    Platform/Src/board.c
-    Platform/Src/timebase.c
-    Platform/Src/watchdog.c
-)
-
-# Add include paths
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    Application/Inc
-    Platform/Inc
-    Protocol
-)
-
-# Add project symbols (macros)
-target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
-    UGV_NODE_ROLE_${UGV_NODE_ROLE}
-)
-
-# Remove wrong libob.a library dependency when using cpp files
-list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
-
-# Add linked libraries
-target_link_libraries(${CMAKE_PROJECT_NAME}
-    stm32cubemx
-
-    # Add user defined libraries
-)
+add_subdirectory(firmware/stm32-common)

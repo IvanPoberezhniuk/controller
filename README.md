@@ -1,66 +1,76 @@
-# UGV Controller Firmware (STM32G431CBT6)
+# UGV controller monorepo
 
-Motor-control node firmware for one side of the 6x6 UGV — see `CLAUDE.md`
-and `.claude/skills/` for the full project architecture, hardware
-decisions, and roadmap. This node drives three BTS7960-based brushed-DC
-motors (front/center/rear) with quadrature encoder feedback.
+Firmware and protocol definitions for the 6x6 UGV. The vehicle has two
+STM32G431CBT6 motor-control nodes, one ESP32-S3 auxiliary/UI node, and a
+Raspberry Pi 5 as the high-level computer and CAN coordinator.
 
-## Status: Milestone 1 (bring-up)
+## Nodes
 
-Per the roadmap in `CLAUDE.md`, this is the "control one motor" stage —
-hardware/pin configuration covers all three motors, but only `motor0`
-(front) is exercised so far. No CAN yet (added in a later milestone);
-motor commands and telemetry go over the debug USART2 console instead.
+| Node | Responsibilities |
+| --- | --- |
+| STM32 Left | Front-left, center-left, rear-left motors; encoders; six R_IS/L_IS signals; three motor temperatures |
+| STM32 Right | Front-right, center-right, rear-right motors; encoders; six R_IS/L_IS signals; three motor temperatures |
+| ESP32 AUX | OLED, encoder UI, IMU, ambient light, GPS, vehicle lighting, buzzer, CAN/TWAI |
+| Raspberry Pi 5 | Camera, full audio, navigation, high-level control, logging and CAN coordination |
 
-## Layout
+Each STM32 owns one CD74HC4067. Both STM32 targets compile the same motor
+firmware and select only their role-specific configuration at build time.
 
+## Repository layout
+
+```text
+firmware/
+  stm32-common/  shared CubeMX/HAL and motor-control implementation
+  stm32-left/    left node identity, mux map and calibration signs
+  stm32-right/   right node identity, mux map and calibration signs
+  esp32/         independent ESP-IDF project for Sixspan ESP32-S3-N16R8
+shared/can/      protocol IDs, payload types, explicit codec and DBC
+Tests/           host-side STM32 math and CAN codec tests
+docs/            architecture, wiring, pinouts and CubeMX notes
+tools/           build, flash and serial-console PowerShell scripts
 ```
-Core/, Drivers/          STM32CubeMX-generated (HAL, CMSIS, startup, MX_*_Init)
-Application/              Control algorithms: motor_control, encoder,
-                           current_monitor, fault_manager, safety, configuration,
-                           app_main (ties it together, called from Core/Src/main.c)
-Platform/                 Hardware adapters not owned by CubeMX: board (reset
-                           reason), timebase (TIM6-paced control loop), watchdog
-Protocol/                 can_protocol.h -- data-only CAN message/ID definitions,
-                           shared reference for when FDCAN is wired up later
-Tests/                    Host-buildable (non-ARM) tests for the pure math in
-                           Application/Src/motor_math.c
-UGV_Controllers.ioc        CubeMX project file -- edit pin/clock/peripheral
-                           config here, then regenerate
+
+`F:\work\academy\blinkESP32` is not part of this repository and remains an
+untouched reference for the proven SH1106 OLED setup.
+
+## STM32 builds
+
+From the repository root:
+
+```powershell
+cmake --preset stm32-left-debug
+cmake --build --preset stm32-left-debug
+
+cmake --preset stm32-right-debug
+cmake --build --preset stm32-right-debug
 ```
 
-## Building
+Images are written to:
 
-Uses the STM32Cube-for-VS-Code bundle manager's toolchain (arm-none-eabi-gcc,
-ninja, cmake) via `cmake --preset Debug && cmake --build build/Debug`, or the
-VS Code CMake Tools integration.
+- `build/stm32-left-debug/UGV_STM32_LEFT.elf`
+- `build/stm32-right-debug/UGV_STM32_RIGHT.elf`
 
-Node role (`LEFT`/`RIGHT`, both nodes run identical source) is a CMake
-option: `-DUGV_NODE_ROLE=RIGHT` (defaults to `LEFT`).
+Flash with `tools/flash-left.ps1` or `tools/flash-right.ps1`.
 
-## Debug console (USART2, 115200 8N1)
+## ESP32 build
 
-Commands: `arm`, `estop`, `clear`, `m<0|1|2> <rpm>` (e.g. `m0 120`).
-Telemetry line printed ~4 Hz.
+From an initialized ESP-IDF shell:
 
-## Known placeholders (see `.claude/skills/ugv-project-plan`)
-
-- `Application/Inc/configuration.h` tunables (PID gains, encoder counts/rev,
-  current-sense scale, stall threshold) are conservative bench defaults, not
-  measured values.
-- Control loop is polled from TIM6's update flag, not interrupt-driven (its
-  NVIC interrupt isn't enabled in the current `.ioc`).
-- `PA10` still carries the CubeMX macro name `MOTOR2_R_EN_Pin` in
-  `Core/Inc/main.h` even though that pin is actually `TIM1_CH3` (motor1
-  RPWM) -- a stale label from an earlier pin reassignment. The real motor2
-  R_EN output is `PB10`, which has no CubeMX label at all. `Platform/Inc/board.h`
-  defines `MOTOR2_R_EN_REAL_Pin`/`_GPIO_Port` for the correct pin; don't use
-  `MOTOR2_R_EN_Pin` from `main.h` for GPIO control.
-
-## Running host-side tests
-
+```powershell
+idf.py -C firmware/esp32 set-target esp32s3
+idf.py -C firmware/esp32 build
 ```
-gcc -std=c11 -Wall -Wextra -IApplication/Inc \
-    Tests/test_motor_control.c Application/Src/motor_math.c -lm \
-    -o test_motor_control && ./test_motor_control
-```
+
+The ESP32 project currently provides the board definition, shared CAN codec,
+16 MB flash/8 MB octal PSRAM defaults, and a minimal bring-up application.
+Peripheral drivers are added independently after hardware validation.
+
+## Current bring-up status
+
+The STM32 motor firmware is still at motor-node bring-up stage. FDCAN is not
+yet enabled in CubeMX. Current monitoring is being migrated to the local
+CD74HC4067 and its final GPIO/ADC pin assignment still has to be committed to
+the `.ioc` before that module can build and run on hardware.
+
+See [architecture](docs/architecture.md), [CAN protocol](docs/can-protocol.md),
+and the node pinout documents under `docs/`.

@@ -1,0 +1,32 @@
+VERSION "1.0"
+
+NS_ :
+    NS_DESC_
+    CM_
+    BA_DEF_
+    BA_
+    VAL_
+
+BS_:
+
+BU_: RPI STM32_LEFT STM32_RIGHT ESP32_AUX
+
+BO_ 256 VehicleMotion: 8 RPI
+ SG_ Sequence : 0|8@1+ (1,0) [0|255] "" STM32_LEFT,STM32_RIGHT
+ SG_ ModeFlags : 8|8@1+ (1,0) [0|255] "" STM32_LEFT,STM32_RIGHT
+ SG_ LeftTarget : 16|16@1- (1,0) [-32768|32767] "rpm" STM32_LEFT
+ SG_ RightTarget : 32|16@1- (1,0) [-32768|32767] "rpm" STM32_RIGHT
+ SG_ Limit : 48|8@1+ (1,0) [0|255] "%" STM32_LEFT,STM32_RIGHT
+ SG_ Reserved : 56|8@1+ (1,0) [0|255] "" STM32_LEFT,STM32_RIGHT
+
+BO_ 272 SystemEnable: 2 RPI
+ SG_ Enabled : 0|8@1+ (1,0) [0|1] "" STM32_LEFT,STM32_RIGHT,ESP32_AUX
+ SG_ EmergencyStop : 8|8@1+ (1,0) [0|1] "" STM32_LEFT,STM32_RIGHT,ESP32_AUX
+
+BO_ 288 AuxLighting: 4 RPI
+ SG_ FrontLight : 0|8@1+ (1,0) [0|100] "%" ESP32_AUX
+ SG_ RearLight : 8|8@1+ (1,0) [0|100] "%" ESP32_AUX
+ SG_ LeftIndicator : 16|8@1+ (1,0) [0|1] "" ESP32_AUX
+ SG_ RightIndicator : 24|8@1+ (1,0) [0|1] "" ESP32_AUX
+
+CM_ "Canonical UGV Classic CAN description. Multi-byte signals are little-endian.";

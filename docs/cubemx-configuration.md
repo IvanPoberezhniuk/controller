@@ -1,6 +1,6 @@
 # CubeMX Configuration Reference — STM32G431CBT6 UGV Motor Node
 
-Every parameter set in `UGV_Controllers.ioc` for this board, and why. Written
+Every parameter set in `firmware/stm32-common/UGV_MotorNode.ioc` for this board, and why. Written
 as a learning reference after building this project's Milestone 1
 (one node, three motors, no CAN yet) — see `CLAUDE.md` for the wider project.
 
@@ -10,7 +10,7 @@ as a learning reference after building this project's Milestone 1
 |---|---|---|
 | MCU | STM32G431CBTx | Confirmed hardware — LQFP48, 128KB flash, 32KB RAM, Cortex-M4F. Selected directly (not via a Nucleo board), since this is a custom PCB. |
 | Toolchain/IDE | CMake | Portable, works with VS Code, not tied to a specific IDE's project format. |
-| Application Structure | Advanced | Gives finer per-peripheral parameter control in the CubeMX GUI. **Not** physical file separation — checked the actual generated tree and every `MX_*_Init()` (`MX_TIM1_Init`, `MX_ADC2_Init`, etc.) still lands in `Core/Src/main.c`, not separate `tim.c`/`adc.c`/`usart.c` files. Hand-written application code stays out of the way by living entirely outside `Core/` (`Application/`, `Platform/`, `Protocol/`), not because of this setting. |
+| Application Structure | Advanced | Gives finer per-peripheral parameter control in the CubeMX GUI. **Not** physical file separation — checked the actual generated tree and every `MX_*_Init()` (`MX_TIM1_Init`, `MX_ADC2_Init`, etc.) still lands in `firmware/stm32-common/Core/Src/main.c`, not separate `tim.c`/`adc.c`/`usart.c` files. Hand-written application code stays outside generated `Core/`; platform-neutral CAN definitions live in `shared/can`. |
 
 ## Clock configuration
 
@@ -68,8 +68,8 @@ general-purpose timers convenient for this on one chip.
 | Field | Value | Why |
 |---|---|---|
 | Activated | Yes | TIM6 is a basic timer with no GPIO pins at all — purely an internal time base, used to pace the motor-control loop at a fixed rate rather than an arbitrary `HAL_Delay` loop. |
-| NVIC global interrupt | *(intended, but never actually got enabled)* | The plan was interrupt-driven; in practice the interrupt was never turned on in the `.ioc`, so the firmware polls TIM6's update flag from the main loop instead (`Platform/timebase.c`). Functionally fine for now — still timer-paced, just not interrupt-driven — but worth revisiting later for tighter timing jitter. |
-| Period / Prescaler shown in `.ioc` | Left at CubeMX's default (65535) | The firmware overrides **both** at runtime in `Platform/Src/timebase.c` — `timebase_init()` explicitly calls `__HAL_TIM_SET_PRESCALER()` and `__HAL_TIM_SET_AUTORELOAD()` for a 500 Hz tick, rather than depending on getting both GUI fields exactly right. Keeps the control-loop rate a single documented constant in code instead of split between the `.ioc` and firmware. Current values (at the 170 MHz clock): `PSC=169` → `170,000,000/170 = 1,000,000` Hz counter clock, `ARR=1999` → `1,000,000/500 Hz − 1 = 1999`. TIM6 is a 16-bit basic timer (ARR max 65535), so — unlike TIM1/TIM15 above — a real prescaler is now required: `170,000,000/500 = 340,000` no longer fits in ARR alone with `PSC=0`. **This was caught as a real bug**: when SYSCLK moved from 16 MHz to 170 MHz, the old values (`PSC=0`, `ARR=31999`, correct for `16,000,000/32,000=500 Hz`) were left unchanged, silently producing a real tick rate of `170,000,000/32,000 = 5312.5 Hz` — ~10.6x too fast — which then fed a stale `dt_s=1/500` into every PID/ramp calculation in the control loop. Cheap way to sanity-check this in hardware without a scope: `app_main.c` prints a telemetry line every `TIMEBASE_CONTROL_LOOP_HZ/4` ticks (intended ~4 Hz) — at the bug's 5312.5 Hz it printed at ~42.5 Hz instead, visibly wrong on the console. |
+| NVIC global interrupt | *(intended, but never actually got enabled)* | The plan was interrupt-driven; in practice the interrupt was never turned on in the `.ioc`, so the firmware polls TIM6's update flag from the main loop instead (`firmware/stm32-common/Platform/Src/timebase.c`). Functionally fine for now — still timer-paced, just not interrupt-driven — but worth revisiting later for tighter timing jitter. |
+| Period / Prescaler shown in `.ioc` | Left at CubeMX's default (65535) | The firmware overrides **both** at runtime in `firmware/stm32-common/Platform/Src/timebase.c` — `timebase_init()` explicitly calls `__HAL_TIM_SET_PRESCALER()` and `__HAL_TIM_SET_AUTORELOAD()` for a 500 Hz tick, rather than depending on getting both GUI fields exactly right. Keeps the control-loop rate a single documented constant in code instead of split between the `.ioc` and firmware. Current values (at the 170 MHz clock): `PSC=169` → `170,000,000/170 = 1,000,000` Hz counter clock, `ARR=1999` → `1,000,000/500 Hz − 1 = 1999`. TIM6 is a 16-bit basic timer (ARR max 65535), so — unlike TIM1/TIM15 above — a real prescaler is now required: `170,000,000/500 = 340,000` no longer fits in ARR alone with `PSC=0`. **This was caught as a real bug**: when SYSCLK moved from 16 MHz to 170 MHz, the old values (`PSC=0`, `ARR=31999`, correct for `16,000,000/32,000=500 Hz`) were left unchanged, silently producing a real tick rate of `170,000,000/32,000 = 5312.5 Hz` — ~10.6x too fast — which then fed a stale `dt_s=1/500` into every PID/ramp calculation in the control loop. Cheap way to sanity-check this in hardware without a scope: `app_main.c` prints a telemetry line every `TIMEBASE_CONTROL_LOOP_HZ/4` ticks (intended ~4 Hz) — at the bug's 5312.5 Hz it printed at ~42.5 Hz instead, visibly wrong on the console. |
 
 ## USART2 — debug console
 
@@ -101,7 +101,7 @@ external CAN transceiver hardware is selected).
 | Number Of Conversion | 5 | Must match the channel count exactly, or the scan sequence doesn't cover everything. |
 | Rank → Channel mapping | Rank1=CH3, Rank2=CH4, Rank3=CH12, Rank4=CH13, Rank5=CH17 | Each Rank needs its own explicit Channel assignment — CubeMX's generated code silently reused the *first* channel for every rank when this wasn't set per-rank, another real mistake caught by reading the generated `main.c` rather than trusting the GUI. |
 
-Firmware side (`Application/Src/current_monitor.c`): both ADCs are
+Firmware side (`firmware/stm32-common/Application/Src/current_monitor.c`): both ADCs are
 calibrated once at startup via `HAL_ADCEx_Calibration_Start()` before any
 conversions are trusted, and all ranks are read by polling
 (`HAL_ADC_Start` → `HAL_ADC_PollForConversion` → `HAL_ADC_GetValue`, once
@@ -134,7 +134,7 @@ eventually calibrated against real hardware.
 | PB1 | `MOTOR0_L_EN` | Same reasoning, adjacent pin for a clean layout. |
 | PB8 | `MOTOR1_R_EN` | Free GPIO after TIM1/TIM2/USART2/ADC pins were claimed. |
 | PB9 | `MOTOR1_L_EN` | Same. |
-| PB10 | `MOTOR2_R_EN` (intended) | Free GPIO — but the CubeMX **User Label never actually got set** on this pin despite repeated attempts, so `main.h` has no macro for it. Firmware works around this directly (`Platform/board.h` defines `MOTOR2_R_EN_REAL_Pin`/`_GPIO_Port` pointing at `GPIOB`/`GPIO_PIN_10` explicitly). Worth fixing properly next time the `.ioc` is regenerated: click PB10, re-enter the User Label. |
+| PB10 | `MOTOR2_R_EN` (intended) | Free GPIO — but the CubeMX **User Label never actually got set** on this pin despite repeated attempts, so `main.h` has no macro for it. Firmware works around this directly (`firmware/stm32-common/Platform/Inc/board.h` defines `MOTOR2_R_EN_REAL_Pin`/`_GPIO_Port` pointing at `GPIOB`/`GPIO_PIN_10` explicitly). Worth fixing properly next time the `.ioc` is regenerated: click PB10, re-enter the User Label. |
 | PB11 | `MOTOR2_L_EN` | Free GPIO. |
 
 Each motor's R_EN/L_EN are separate GPIOs (not tied together in software)
@@ -156,7 +156,7 @@ disabled independently without cutting power to the other two.
 3. **ADC "Differential" is the CubeMX default for some channel numbers** (IN3, IN12 on this chip) — easy to silently get a wrong reading if not explicitly switched to Single-ended, and differential mode "borrows" the next channel number as its reference input, blocking it from being used independently.
 4. **Multi-channel ADC scan sequences need each Rank's Channel set individually** — leaving it unset after the first Rank causes every Rank to silently reuse the first channel.
 5. **Encoder Mode has three options (TI1 / TI2 / TI1 and TI2)** that all "work" (compile, no CubeMX warning) but only "TI1 and TI2" gives full quadrature resolution — the other two silently halve it.
-6. **Raising SYSCLK in CubeMX (16 MHz → 170 MHz via PLL) does not recompute any dependent `Period`/`Prescaler` field.** Those are stored as raw numbers in the `.ioc`, not formulas re-derived from the clock tree. TIM1/TIM15's PWM period (`799`, a 16 MHz-derived value) and TIM6's hand-rolled control-loop prescaler/ARR (also 16 MHz-derived, and hardcoded a second time in `Platform/Src/timebase.c` rather than in the `.ioc`) were both silently wrong after the clock change until audited and fixed by hand. Rule going forward: after any SYSCLK change, re-derive every timer/ADC value in this document from scratch rather than assuming CubeMX carried them forward correctly — and grep the firmware source for hardcoded clock-frequency literals (e.g. `16000000u`) in addition to checking the `.ioc`.
+6. **Raising SYSCLK in CubeMX (16 MHz → 170 MHz via PLL) does not recompute any dependent `Period`/`Prescaler` field.** Those are stored as raw numbers in the `.ioc`, not formulas re-derived from the clock tree. TIM1/TIM15's PWM period (`799`, a 16 MHz-derived value) and TIM6's hand-rolled control-loop prescaler/ARR (also 16 MHz-derived, and hardcoded a second time in `firmware/stm32-common/Platform/Src/timebase.c` rather than in the `.ioc`) were both silently wrong after the clock change until audited and fixed by hand. Rule going forward: after any SYSCLK change, re-derive every timer/ADC value in this document from scratch rather than assuming CubeMX carried them forward correctly — and grep the firmware source for hardcoded clock-frequency literals (e.g. `16000000u`) in addition to checking the `.ioc`.
 
 ## Future: FDCAN clock (not configured yet)
 

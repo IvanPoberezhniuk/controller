@@ -2,37 +2,61 @@
     "version": 3,
     "configurePresets": [
         {
-            "name": "default",
+            "name": "stm32-base",
             "hidden": true,
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/${presetName}",
-		    "toolchainFile": "${sourceDir}/cmake/gcc-arm-none-eabi.cmake",
+            "toolchainFile": "${sourceDir}/firmware/stm32-common/cmake/gcc-arm-none-eabi.cmake"
+        },
+        {
+            "name": "stm32-left-debug",
+            "inherits": "stm32-base",
             "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "UGV_NODE_ROLE": "LEFT"
             }
         },
         {
-            "name": "Debug",
-            "inherits": "default",
+            "name": "stm32-right-debug",
+            "inherits": "stm32-base",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
+                "CMAKE_BUILD_TYPE": "Debug",
+                "UGV_NODE_ROLE": "RIGHT"
             }
         },
         {
-            "name": "Release",
-            "inherits": "default",
+            "name": "stm32-left-release",
+            "inherits": "stm32-base",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
+                "CMAKE_BUILD_TYPE": "Release",
+                "UGV_NODE_ROLE": "LEFT"
+            }
+        },
+        {
+            "name": "stm32-right-release",
+            "inherits": "stm32-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "UGV_NODE_ROLE": "RIGHT"
             }
         }
     ],
     "buildPresets": [
         {
-            "name": "Debug",
-            "configurePreset": "Debug"
+            "name": "stm32-left-debug",
+            "configurePreset": "stm32-left-debug"
         },
         {
-            "name": "Release",
-            "configurePreset": "Release"
+            "name": "stm32-right-debug",
+            "configurePreset": "stm32-right-debug"
+        },
+        {
+            "name": "stm32-left-release",
+            "configurePreset": "stm32-left-release"
+        },
+        {
+            "name": "stm32-right-release",
+            "configurePreset": "stm32-right-release"
         }
     ]
 }

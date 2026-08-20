@@ -1,4 +1,4 @@
-build
+/build/
 !.settings
 
 # Eclipse/STM32CubeIDE workspace metadata (created if the IDE is opened here)
@@ -7,3 +7,11 @@ build
 # CubeMX "Generate Report" artifacts
 UGV_Controllers.pdf
 UGV_Controllers.txt
+firmware/stm32-common/UGV_MotorNode.pdf
+firmware/stm32-common/UGV_MotorNode.txt
+
+# ESP-IDF generated state (defaults and partition table are committed).
+firmware/esp32/build/
+firmware/esp32/sdkconfig
+firmware/esp32/sdkconfig.old
+firmware/esp32/managed_components/
