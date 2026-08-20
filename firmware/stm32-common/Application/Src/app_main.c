@@ -13,8 +13,8 @@
 #include "safety.h"
 #include "configuration.h"
 
-/* Bring-up-only debug-UART command console. Stand-in for the CAN command
- * path (0x100/0x110 messages) until the "add CAN" roadmap milestone --
+/* Bring-up-only debug-UART command console. Stand-in for the final ESP32 CAN
+ * command path (0x100/0x110 messages) until the "add CAN" roadmap milestone --
  * see shared/can/ugv_can_protocol.h. Commands: "arm", "estop", "clear",
  * "m<index> <rpm>" e.g. "m0 120". */
 #define CMD_LINE_MAX 32

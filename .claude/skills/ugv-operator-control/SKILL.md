@@ -7,18 +7,14 @@ description: TRIGGER when discussing the UGV's operator input devices (Xbox cont
 
 ## Control devices and paths
 
-Previously discussed: Xbox controller, PC control application, ExpressLRS
-ES24TX transmitter module, ExpressLRS receiver on the rover, Wi-Fi for
-high-bandwidth communication, ELRS for robust low-bandwidth control and basic
-telemetry.
+Confirmed radio path: RadioMaster Nomad Gemini Xrossband transmitter module
+and RadioMaster XR4 receiver. XR4 connects directly to ESP32 over full-duplex
+CRSF. Wi-Fi remains the high-bandwidth link.
 
 ```text
-Xbox controller
-    -> Windows control station
-    -> control protocol
-    -> ELRS transmitter or Wi-Fi
-    -> rover receiver/Pi
-    -> STM32 nodes
+XR4 -> ESP32 MANUAL input
+Raspberry Pi -> ESP32 AUTO request
+ESP32 -> final CAN command -> STM32 nodes
 ```
 
 ELRS is appropriate for: command channels, mode selection, emergency state,
@@ -31,17 +27,17 @@ logs, software updates, future ROS 2 communication.
 
 ## Control authority
 
-The command hierarchy must define which source owns control, e.g.:
+The confirmed command hierarchy is:
 
 ```text
 disabled
 manual ELRS
-manual PC/Wi-Fi
-test mode
-future autonomous mode
+autonomous Raspberry Pi
 ```
 
 **Only one source may have motion authority at a time.**
+The operator selects the mode explicitly; source failure stops the vehicle and
+does not automatically switch to the other source.
 
 ## PC control-station software
 

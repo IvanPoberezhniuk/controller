@@ -18,9 +18,9 @@ fixed.
 The Pi performs: video capture/compression, network communication, PC
 control-station communication, high-level command processing, telemetry
 aggregation, system configuration, logging, future navigation/computer
-vision, optional ROS 2 integration, updating commands sent to STM32 nodes,
-presenting faults to the operator, optional coordination of lights/auxiliary
-modules.
+vision, optional ROS 2 integration, sending AUTO requests to the ESP32
+command arbiter, presenting faults to the operator, and optional coordination
+of lights/auxiliary modules.
 
 **The Pi must not directly perform timing-critical wheel PID control** —
 Linux scheduling delays must not be able to produce uncontrolled motor
@@ -32,7 +32,7 @@ behavior. That responsibility stays on STM32 (`ugv-stm32-firmware`).
 ugv-control-gateway
 - receives operator commands;
 - validates commands;
-- converts commands to CAN;
+- converts autonomous commands to ESP32 CAN requests;
 - aggregates CAN telemetry;
 - manages heartbeats.
 

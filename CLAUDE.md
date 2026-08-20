@@ -34,31 +34,23 @@ against the unresolved-decisions and rejected-approaches registers in the
 ## Confirmed target architecture
 
 ```text
-                    OPERATOR
-        Xbox controller / PC control station
-                      |
-            Wi-Fi and/or ExpressLRS
-                      |
-                      v
-               Raspberry Pi 5
-       video, networking, logs, telemetry,
-       high-level commands, future autonomy
-                      |
-              SocketCAN / CAN bus
-                      |
-        +-------------+-------------+------------------+
-        |                           |                  |
-        v                           v                  v
-STM32G431CBT6 left node      STM32G431CBT6 right node  ESP32-S3 AUX
-3 encoders                   3 encoders                OLED + encoder UI
-3 PID loops                  3 PID loops               IMU + light + GPS
-3 motor drivers              3 motor drivers           lighting + buzzer
-CD74HC4067                   CD74HC4067
-temps/current                temps/current
-local failsafe               local failsafe
-        |                           |
-        v                           v
-front/center/rear left       front/center/rear right
+Radio + Nomad -> XR4 --CRSF--> ESP32-S3 control/AUX <--CAN--> Raspberry Pi 5
+                                MANUAL/AUTO arbiter           autonomy/logs
+                                OLED/IMU/GPS/lights           camera/audio
+                                         |
+                                  final CAN commands
+                                         |
+                           +-------------+-------------+
+                           |                           |
+                           v                           v
+               STM32G431CBT6 left          STM32G431CBT6 right
+               3 encoders / PID loops      3 encoders / PID loops
+               3 motor drivers             3 motor drivers
+               CD74HC4067                   CD74HC4067
+               local failsafe              local failsafe
+                           |                           |
+                           v                           v
+               front/center/rear left       front/center/rear right
 
 Motors:
 6 x JGB37-520 brushed DC gearmotors
@@ -94,8 +86,9 @@ Firmware repository:
 4. Show calculations with units. State assumptions explicitly.
 5. Never describe an unresolved component as purchased or finalized.
 6. Prioritize safe bench validation before vehicle testing.
-7. Keep motor-control safety on STM32, auxiliary UI/sensors/lighting on ESP32,
-   and video/networking/logging/high-level behavior on Raspberry Pi.
+7. Keep motor-control safety on STM32; CRSF arbitration, final CAN command
+   authority, auxiliary UI/sensors/lighting on ESP32; and video/networking/
+   logging/autonomy requests on Raspberry Pi.
 8. Keep the CAN wire contract in `shared/can/ugv_can_protocol.h` and verify
    its DBC mirror with `Tests/can/test_dbc_sync.ps1`.
 9. Include failure behavior in every implementation.

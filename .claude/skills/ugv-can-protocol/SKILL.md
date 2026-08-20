@@ -23,17 +23,21 @@ but classic CAN is sufficient for initial motor commands and telemetry.
 
 ## Network participants
 
-Initial nodes: Raspberry Pi CAN interface/gateway, left STM32G431 motor
-controller, right STM32G431 motor controller.
+Initial nodes: Raspberry Pi high-level computer, ESP32 command/AUX node, left
+STM32G431 motor controller, and right STM32G431 motor controller.
 
 Potential future nodes: battery/BMS gateway, lighting controller, robotic
 arm, turret, suspension controller, detachable wheel modules, sensor module.
 
 ## Command principles
 
-The motion command contains a sequence counter, drive-mode flags, signed
+The final motion command contains a sequence counter, drive-mode flags, signed
 left/right RPM targets, and a percentage limit. Enable/emergency stop uses a
 separate frame. Individual six-wheel targets remain an unresolved encoding.
+
+Only ESP32 produces final command IDs 0x100/0x110. Raspberry Pi sends AUTO
+requests on 0x101/0x111, and ESP32 explicitly arbitrates MANUAL CRSF versus
+AUTO. Loss of the selected source stops the vehicle; never auto-switch modes.
 
 Motor nodes must reject: malformed frames, invalid length, invalid mode,
 impossible target values, stale counters, out-of-range values.
@@ -42,8 +46,11 @@ impossible target values, stale counters, out-of-range values.
 
 ```text
 0x100 — vehicle motion command
+0x101 — Raspberry Pi autonomous motion request
 0x110 — system enable / emergency stop
+0x111 — Raspberry Pi autonomous enable request
 0x120 — auxiliary or lighting command
+0x130 — ESP32 control-source and CRSF-link status
 
 0x180 — left-node fast telemetry
 0x181 — right-node fast telemetry
@@ -79,8 +86,8 @@ is designed: six values require 12 bytes and cannot fit in one frame.
 
 ## Heartbeat and timeout
 
-Raspberry Pi sends motion commands at 50-100 Hz. The current motor-node
-timeout is 300 ms and is declared centrally in `ugv_can_protocol.h`; tune it
-only after measuring real bus and control-path latency.
+ESP32 sends final motion commands at 50-100 Hz. The RC timeout is 100 ms; Pi
+AUTO-request and motor-node final-command timeouts are 300 ms. Values are
+declared centrally in `ugv_can_protocol.h`; tune only after measurement.
 
 **The STM32 must not continue using the last speed command indefinitely.**

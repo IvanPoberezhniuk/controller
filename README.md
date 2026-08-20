@@ -1,8 +1,8 @@
 # UGV controller monorepo
 
 Firmware and protocol definitions for the 6x6 UGV. The vehicle has two
-STM32G431CBT6 motor-control nodes, one ESP32-S3 auxiliary/UI node, and a
-Raspberry Pi 5 as the high-level computer and CAN coordinator.
+STM32G431CBT6 motor-control nodes, one ESP32-S3 control/AUX node, and a
+Raspberry Pi 5 as the high-level computer.
 
 ## Nodes
 
@@ -10,8 +10,8 @@ Raspberry Pi 5 as the high-level computer and CAN coordinator.
 | --- | --- |
 | STM32 Left | Front-left, center-left, rear-left motors; encoders; six R_IS/L_IS signals; three motor temperatures |
 | STM32 Right | Front-right, center-right, rear-right motors; encoders; six R_IS/L_IS signals; three motor temperatures |
-| ESP32 AUX | OLED, encoder UI, IMU, ambient light, GPS, vehicle lighting, buzzer, CAN/TWAI |
-| Raspberry Pi 5 | Camera, full audio, navigation, high-level control, logging and CAN coordination |
+| ESP32 control/AUX | XR4 CRSF receiver, MANUAL/AUTO arbitration, final CAN commands, OLED, encoder UI, IMU, ambient light, GPS, lighting, buzzer |
+| Raspberry Pi 5 | Camera, full audio, navigation, autonomous command requests, networking and logging |
 
 Each STM32 owns one CD74HC4067. Both STM32 targets compile the same motor
 firmware and select only their role-specific configuration at build time.

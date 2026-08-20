@@ -38,10 +38,12 @@ Same firmware, another node ID. Validate left/right symmetry, motor/encoder
 inversion, simultaneous six-motor operation, CAN bus loading, power
 transients, thermal behavior. **Deliverable:** six-wheel bench test.
 
-### Phase 6: Raspberry Pi gateway
-SocketCAN, CAN protocol library, control-source manager, command heartbeat,
-telemetry aggregation, SQLite logging, service supervision, configuration
-API. **Deliverable:** Pi commands both STM32 nodes and records telemetry.
+### Phase 6: ESP32 command gateway and Raspberry Pi integration
+XR4 CRSF parser, ESP32 MANUAL/AUTO control-source manager, TWAI final-command
+publisher, SocketCAN Pi AUTO requests, command heartbeats, telemetry
+aggregation, SQLite logging, service supervision, configuration API.
+**Deliverable:** ESP32 commands both STM32 nodes; Pi requests AUTO motion and
+records telemetry.
 
 ### Phase 7: manual driving
 Xbox input, PC application, throttle/steering mixing, arming, emergency
