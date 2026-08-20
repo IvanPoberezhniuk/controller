@@ -54,6 +54,18 @@ Images are written to:
 
 Flash with `tools/flash-left.ps1` or `tools/flash-right.ps1`.
 
+## Tests
+
+Run all HAL-independent motor math, safety/fault, CAN codec, and DBC-sync
+tests with:
+
+```powershell
+.\tools\test-host.ps1
+```
+
+`tools/build-all.ps1` runs these tests after both STM32 builds unless
+`-SkipHostTests` is supplied.
+
 ## ESP32 build
 
 From an initialized ESP-IDF shell:

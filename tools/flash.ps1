@@ -9,10 +9,10 @@ if (-not $Node) {
     throw "Select -Node Left or -Node Right."
 }
 
-$bundles = "$env:LOCALAPPDATA\stm32cube\bundles"
-$env:Path = "$bundles\gnu-tools-for-stm32\14.3.1+st.2\bin;" +
-            "$bundles\cmake\4.3.1+st.1\bin;" +
-            "$bundles\ninja\1.13.2+st.1\bin;" + $env:Path
+. (Join-Path $PSScriptRoot "stm32-env.ps1")
+if (-not $Stm32ProgrammerCli) {
+    throw "STM32 Programmer bundle is not installed."
+}
 
 Set-Location (Join-Path $PSScriptRoot "..")
 
@@ -39,5 +39,4 @@ if (-not (Test-Path -LiteralPath $elf)) {
     throw "Firmware image not found: $elf"
 }
 
-& "$bundles\programmer\2.22.0+st.1\bin\STM32_Programmer_CLI.exe" `
-    -c port=SWD -w $elf -v -rst
+& $Stm32ProgrammerCli -c port=SWD -w $elf -v -rst
