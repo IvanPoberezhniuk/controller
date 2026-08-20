@@ -41,6 +41,14 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     UGV_NODE_ROLE_${UGV_NODE_ROLE_UPPER}
 )
 
+option(UGV_FINAL_OTA_PINOUT
+       "CubeMX has PA11/PA12 FDCAN and PB8 TIM16 final OTA pinout" OFF)
+if(UGV_FINAL_OTA_PINOUT)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
+        UGV_FINAL_OTA_PINOUT_CONFIGURED=1
+    )
+endif()
+
 if(UGV_LINKER_LAYOUT STREQUAL "OTA_APP")
     # SystemInit relocates VTOR even when the application is launched directly
     # under a debugger rather than through the bootloader jump path.
