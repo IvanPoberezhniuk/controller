@@ -22,6 +22,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Src/timebase.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Src/watchdog.c
     ${CMAKE_SOURCE_DIR}/shared/can/ugv_can_codec.c
+    ${CMAKE_SOURCE_DIR}/shared/update/ugv_boot_request_stm32.c
 )
 
 # Add include paths
@@ -30,6 +31,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Inc
     ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Inc
     ${CMAKE_SOURCE_DIR}/shared/can
+    ${CMAKE_SOURCE_DIR}/shared/update
 )
 
 # Add project symbols (macros)
@@ -44,6 +46,7 @@ if(UGV_LINKER_LAYOUT STREQUAL "OTA_APP")
         USER_VECT_TAB_ADDRESS
         VECT_TAB_OFFSET=0x00006000U
     )
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE UGV_OTA_APP)
 endif()
 
 target_link_libraries(${CMAKE_PROJECT_NAME} stm32cubemx)

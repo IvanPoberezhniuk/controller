@@ -12,6 +12,9 @@
 #include "fault_manager.h"
 #include "safety.h"
 #include "configuration.h"
+#if defined(UGV_OTA_APP)
+#include "ugv_boot_request_stm32.h"
+#endif
 
 /* Bring-up-only debug-UART command console. Stand-in for the final ESP32 CAN
  * command path (0x100/0x110 messages) until the "add CAN" roadmap milestone --
@@ -155,4 +158,19 @@ void app_main_run(void)
         s_telemetry_divider = 0;
         print_telemetry();
     }
+}
+
+bool app_main_request_bootloader(void)
+{
+#if defined(UGV_OTA_APP)
+    const safety_state_t state = safety_get_state();
+    if (state != SAFETY_STATE_DISABLED && state != SAFETY_STATE_FAULT &&
+        state != SAFETY_STATE_EMERGENCY_STOP) {
+        return false;
+    }
+
+    motor_control_disable_all();
+    ugv_boot_request_set_and_reset();
+#endif
+    return false;
 }

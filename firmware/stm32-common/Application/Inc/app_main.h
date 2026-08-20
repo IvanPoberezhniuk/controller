@@ -1,6 +1,8 @@
 #ifndef APPLICATION_APP_MAIN_H
 #define APPLICATION_APP_MAIN_H
 
+#include <stdbool.h>
+
 /* Called once from Core/Src/main.c's USER CODE BEGIN 2, after HAL_Init/
  * SystemClock_Config/all MX_*_Init() have run. Owns every Application/
  * Platform module's init so main.c stays a thin generated shell. */
@@ -14,5 +16,10 @@ void app_main_run(void);
  * RDR into a ring buffer so console bytes survive control-loop ticks that
  * run longer than a byte interval; the main loop drains it in poll_uart_rx. */
 void app_main_uart2_rx_isr(void);
+
+/* Called by the future FDCAN command dispatcher for UGV_FW_COMMAND_ENTER.
+ * The request is accepted only in a motor-safe state and only by an OTA-linked
+ * application. On success the function resets and therefore never returns. */
+bool app_main_request_bootloader(void);
 
 #endif /* APPLICATION_APP_MAIN_H */
