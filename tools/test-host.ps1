@@ -45,6 +45,15 @@ try {
         "shared/update/ugv_crc32.c"
     )
 
+    Build-And-Run "test_bootloader" @(
+        "-std=c11", "-Wall", "-Wextra", "-Werror",
+        "-Ishared/can", "-Ishared/update",
+        "-Ifirmware/stm32-bootloader/Core/Inc",
+        "Tests/update/test_bootloader.c",
+        "firmware/stm32-bootloader/Core/Src/ugv_bootloader.c",
+        "shared/update/ugv_crc32.c"
+    )
+
     $stm32TestIncludes = @(
         "-std=c11", "-Wall", "-Wextra", "-Werror", "-DUGV_NODE_ROLE_LEFT",
         "-ITests/stm32/fakes", "-Ifirmware/stm32-common/Application/Inc",
