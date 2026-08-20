@@ -21,10 +21,12 @@ firmware and select only their role-specific configuration at build time.
 ```text
 firmware/
   stm32-common/  shared CubeMX/HAL and motor-control implementation
+  stm32-bootloader/ role-specific FDCAN recovery bootloader
   stm32-left/    left node identity and calibration signs
   stm32-right/   right node identity and calibration signs
   esp32/         independent ESP-IDF project for Sixspan ESP32-S3-N16R8
 shared/can/      protocol IDs, payload types, explicit codec and DBC
+shared/update/   OTA protocol, CRC, metadata and flash layout
 Tests/           host-side STM32 math and CAN codec tests
 docs/            architecture, wiring, pinouts and CubeMX notes
 tools/           build, flash and serial-console PowerShell scripts
@@ -52,7 +54,30 @@ Images are written to:
 - `build/stm32-left-debug/UGV_STM32_LEFT.elf`
 - `build/stm32-right-debug/UGV_STM32_RIGHT.elf`
 
-Flash with `tools/flash-left.ps1` or `tools/flash-right.ps1`.
+The `flash-left.ps1` / `flash-right.ps1` scripts are legacy SWD bench flashing
+for standalone images. They are not used by the CAN OTA flow.
+
+## STM32 bootloader and CAN update
+
+Build both role-specific bootloaders and applications:
+
+```powershell
+.\tools\build-update-images.ps1
+```
+
+After applying the documented final CubeMX FDCAN/TIM16 pin migration, use
+`-FinalPinout`. A blank STM32 receives its matching custom bootloader once over
+USART2 using the factory ROM bootloader. Raspberry Pi then uploads every
+application image through SocketCAN:
+
+```bash
+python3 tools/ugv_can_update.py --interface can0 --node left \
+  --image UGV_STM32_LEFT.bin
+```
+
+The updater rejects standalone images linked at the wrong address. Full wiring,
+one-time UART provisioning, CAN setup, update, and interrupted-transfer
+recovery are in [STM32 firmware update](docs/firmware-update.md).
 
 ## Tests
 
@@ -81,11 +106,15 @@ Peripheral drivers are added independently after hardware validation.
 
 ## Current bring-up status
 
-The STM32 motor firmware is still at motor-node bring-up stage. FDCAN is not
-yet enabled in CubeMX. The CD74HC4067 sampling code and logical channel map are
-ready, but sensing remains a safe no-op until its GPIO/ADC assignment is added
-manually to the `.ioc` and `UGV_MUX_GPIO_CONFIGURED` is enabled.
+The STM32 motor firmware is still at motor-node bring-up stage. The custom
+FDCAN bootloader, power-loss-safe flash state machine, application handoff, and
+Raspberry Pi updater are implemented and host-tested. FDCAN is not yet enabled
+in the checked-in CubeMX application project. The CD74HC4067 sampling code and
+logical channel map are ready, but sensing remains a safe no-op until the
+documented GPIO/ADC assignment is added manually and
+`UGV_MUX_GPIO_CONFIGURED` is enabled.
 
 See [architecture](docs/architecture.md), [wiring and wire colors](docs/wiring.md),
+[CubeMX configuration](docs/cubemx-configuration.md),
 [CAN protocol](docs/can-protocol.md), and the node pinout documents under
 `docs/`.
