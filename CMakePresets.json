@@ -57,6 +57,26 @@
                 "UGV_NODE_ROLE": "RIGHT",
                 "UGV_LINKER_LAYOUT": "OTA_APP"
             }
+        },
+        {
+            "name": "stm32-left-bootloader-release",
+            "inherits": "stm32-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "UGV_NODE_ROLE": "LEFT",
+                "UGV_FIRMWARE_KIND": "BOOTLOADER",
+                "UGV_LINKER_LAYOUT": "BOOTLOADER"
+            }
+        },
+        {
+            "name": "stm32-right-bootloader-release",
+            "inherits": "stm32-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "UGV_NODE_ROLE": "RIGHT",
+                "UGV_FIRMWARE_KIND": "BOOTLOADER",
+                "UGV_LINKER_LAYOUT": "BOOTLOADER"
+            }
         }
     ],
     "buildPresets": [
@@ -83,6 +103,14 @@
         {
             "name": "stm32-right-ota-release",
             "configurePreset": "stm32-right-ota-release"
+        },
+        {
+            "name": "stm32-left-bootloader-release",
+            "configurePreset": "stm32-left-bootloader-release"
+        },
+        {
+            "name": "stm32-right-bootloader-release",
+            "configurePreset": "stm32-right-bootloader-release"
         }
     ]
 }
