@@ -33,6 +33,26 @@ prevents its message table from drifting from the header.
 | 0x720 | 8 | Gateway heartbeat | Raspberry Pi | STM32 nodes, ESP32 |
 | 0x740 | 8 | Auxiliary-node heartbeat | ESP32 AUX | Raspberry Pi |
 
+## Firmware-update messages
+
+Firmware update uses a small recovery protocol outside the operational DBC.
+Its canonical definitions and byte codecs are in
+`shared/update/ugv_fw_update_protocol.h`.
+
+| CAN ID | DLC | Purpose | Direction |
+| ---: | ---: | --- | --- |
+| `0x600` | 8 | ENTER, QUERY, BEGIN, FINISH, ACTIVATE, ABORT | Raspberry Pi to selected STM32 |
+| `0x610` | 8 | Sequence plus six Left image bytes | Raspberry Pi to STM32 Left |
+| `0x611` | 8 | Sequence plus six Right image bytes | Raspberry Pi to STM32 Right |
+| `0x680` | 8 | Left READY/ACK/VERIFIED/ERROR | STM32 Left to Raspberry Pi |
+| `0x681` | 8 | Right READY/ACK/VERIFIED/ERROR | STM32 Right to Raspberry Pi |
+
+The updater acknowledges every 32 data frames, resumes from the next expected
+sequence after a timeout, and verifies CRC-32 before activation. Normal motion
+commands remain unavailable while a node is in its bootloader. See
+[`firmware-update.md`](firmware-update.md) for the state flow and recovery
+procedure.
+
 All receivers reject an unexpected DLC and invalid bounded fields. Motion
 commands carry a sequence counter and must arrive every 10-20 ms. The ESP32 is
 the only producer allowed to use the final command IDs `0x100` and `0x110`;
