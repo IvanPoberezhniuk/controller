@@ -2,6 +2,7 @@
 #define PLATFORM_BOARD_H
 
 #include "main.h"
+#include "node_common_config.h"
 
 /* CubeMX declares these HAL handles as globals in Core/Src/main.c but only
  * within that translation unit's own scope; this header is the single
@@ -12,6 +13,9 @@ extern TIM_HandleTypeDef  htim3;
 extern TIM_HandleTypeDef  htim4;
 extern TIM_HandleTypeDef  htim6;
 extern TIM_HandleTypeDef  htim15;
+#if UGV_FINAL_OTA_PINOUT_CONFIGURED
+extern TIM_HandleTypeDef  htim16;
+#endif
 extern UART_HandleTypeDef huart2;
 extern ADC_HandleTypeDef  hadc1;
 extern ADC_HandleTypeDef  hadc2;

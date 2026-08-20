@@ -16,16 +16,16 @@ void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef *handle)
 
     __HAL_RCC_FDCAN_CONFIG(RCC_FDCANCLKSOURCE_PCLK1);
     __HAL_RCC_FDCAN_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
 
     GPIO_InitTypeDef pins = {
-        .Pin = GPIO_PIN_8 | GPIO_PIN_9,
+        .Pin = GPIO_PIN_11 | GPIO_PIN_12,
         .Mode = GPIO_MODE_AF_PP,
         .Pull = GPIO_NOPULL,
         .Speed = GPIO_SPEED_FREQ_VERY_HIGH,
         .Alternate = GPIO_AF9_FDCAN1,
     };
-    HAL_GPIO_Init(GPIOB, &pins);
+    HAL_GPIO_Init(GPIOA, &pins);
 }
 
 void HAL_FDCAN_MspDeInit(FDCAN_HandleTypeDef *handle)
@@ -33,7 +33,7 @@ void HAL_FDCAN_MspDeInit(FDCAN_HandleTypeDef *handle)
     if (handle == NULL || handle->Instance != FDCAN1) {
         return;
     }
-    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_8 | GPIO_PIN_9);
+    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_11 | GPIO_PIN_12);
     __HAL_RCC_FDCAN_CLK_DISABLE();
 }
 

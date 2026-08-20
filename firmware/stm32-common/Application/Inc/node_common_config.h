@@ -4,6 +4,13 @@
 /* Both motor nodes use the same local CD74HC4067 wiring. Keep sensing
  * disabled until the shared CubeMX project assigns S0-S3 and MUX_SIG. */
 #define UGV_MUX_GPIO_CONFIGURED 0
+
+/* Set to 1 together with the documented manual CubeMX migration:
+ * PA11/PA12 -> FDCAN, PB8 -> TIM16_CH1 center LPWM, PA4/PA5 -> center enables.
+ * Keeping this 0 lets the legacy generated .ioc continue to build meanwhile. */
+#ifndef UGV_FINAL_OTA_PINOUT_CONFIGURED
+#define UGV_FINAL_OTA_PINOUT_CONFIGURED 0
+#endif
 #define UGV_MUX_CH_MOTOR0_RIS  0u
 #define UGV_MUX_CH_MOTOR0_LIS  1u
 #define UGV_MUX_CH_MOTOR1_RIS  2u

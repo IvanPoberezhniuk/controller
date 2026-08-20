@@ -4,7 +4,8 @@
 #include "board.h"
 
 typedef struct {
-    TIM_HandleTypeDef *pwm_timer;
+    TIM_HandleTypeDef *rpwm_timer;
+    TIM_HandleTypeDef *lpwm_timer;
     uint32_t rpwm_channel;
     uint32_t lpwm_channel;
     GPIO_TypeDef *r_en_port;
@@ -17,17 +18,27 @@ typedef struct {
  * board.h. MOTOR2_R_EN_REAL_* is the actual PB10 R_EN output. */
 static const motor_hw_t s_hw[UGV_MOTOR_COUNT] = {
     [MOTOR_FRONT] = {
-        .pwm_timer = &htim1, .rpwm_channel = TIM_CHANNEL_1, .lpwm_channel = TIM_CHANNEL_2,
+        .rpwm_timer = &htim1, .lpwm_timer = &htim1,
+        .rpwm_channel = TIM_CHANNEL_1, .lpwm_channel = TIM_CHANNEL_2,
         .r_en_port = MOTOR0_R_EN_GPIO_Port, .r_en_pin = MOTOR0_R_EN_Pin,
         .l_en_port = MOTOR0_L_EN_GPIO_Port, .l_en_pin = MOTOR0_L_EN_Pin,
     },
     [MOTOR_CENTER] = {
-        .pwm_timer = &htim1, .rpwm_channel = TIM_CHANNEL_3, .lpwm_channel = TIM_CHANNEL_4,
+        .rpwm_timer = &htim1,
+#if UGV_FINAL_OTA_PINOUT_CONFIGURED
+        .lpwm_timer = &htim16,
+        .lpwm_channel = TIM_CHANNEL_1,
+#else
+        .lpwm_timer = &htim1,
+        .lpwm_channel = TIM_CHANNEL_4,
+#endif
+        .rpwm_channel = TIM_CHANNEL_3,
         .r_en_port = MOTOR1_R_EN_GPIO_Port, .r_en_pin = MOTOR1_R_EN_Pin,
         .l_en_port = MOTOR1_L_EN_GPIO_Port, .l_en_pin = MOTOR1_L_EN_Pin,
     },
     [MOTOR_REAR] = {
-        .pwm_timer = &htim15, .rpwm_channel = TIM_CHANNEL_1, .lpwm_channel = TIM_CHANNEL_2,
+        .rpwm_timer = &htim15, .lpwm_timer = &htim15,
+        .rpwm_channel = TIM_CHANNEL_1, .lpwm_channel = TIM_CHANNEL_2,
         .r_en_port = MOTOR2_R_EN_REAL_GPIO_Port, .r_en_pin = MOTOR2_R_EN_REAL_Pin,
         .l_en_port = MOTOR2_L_EN_GPIO_Port, .l_en_pin = MOTOR2_L_EN_Pin,
     },
@@ -53,7 +64,7 @@ static void hw_write_pwm(motor_index_t motor, float pwm_command)
     const motor_hw_t *hw = &s_hw[motor];
     float hardware_command = pwm_command * (float)s_drive_sign[motor];
     float magnitude = (hardware_command < 0.0f) ? -hardware_command : hardware_command;
-    uint32_t period = __HAL_TIM_GET_AUTORELOAD(hw->pwm_timer);
+    uint32_t period = __HAL_TIM_GET_AUTORELOAD(hw->rpwm_timer);
     uint32_t compare = (uint32_t)(magnitude * (float)period);
 
     if (compare > period) {
@@ -61,14 +72,14 @@ static void hw_write_pwm(motor_index_t motor, float pwm_command)
     }
 
     if (hardware_command > 0.0f) {
-        __HAL_TIM_SET_COMPARE(hw->pwm_timer, hw->rpwm_channel, compare);
-        __HAL_TIM_SET_COMPARE(hw->pwm_timer, hw->lpwm_channel, 0u);
+        __HAL_TIM_SET_COMPARE(hw->rpwm_timer, hw->rpwm_channel, compare);
+        __HAL_TIM_SET_COMPARE(hw->lpwm_timer, hw->lpwm_channel, 0u);
     } else if (hardware_command < 0.0f) {
-        __HAL_TIM_SET_COMPARE(hw->pwm_timer, hw->rpwm_channel, 0u);
-        __HAL_TIM_SET_COMPARE(hw->pwm_timer, hw->lpwm_channel, compare);
+        __HAL_TIM_SET_COMPARE(hw->rpwm_timer, hw->rpwm_channel, 0u);
+        __HAL_TIM_SET_COMPARE(hw->lpwm_timer, hw->lpwm_channel, compare);
     } else {
-        __HAL_TIM_SET_COMPARE(hw->pwm_timer, hw->rpwm_channel, 0u);
-        __HAL_TIM_SET_COMPARE(hw->pwm_timer, hw->lpwm_channel, 0u);
+        __HAL_TIM_SET_COMPARE(hw->rpwm_timer, hw->rpwm_channel, 0u);
+        __HAL_TIM_SET_COMPARE(hw->lpwm_timer, hw->lpwm_channel, 0u);
     }
 }
 
@@ -86,8 +97,8 @@ void motor_control_init(void)
     for (motor_index_t m = 0; m < UGV_MOTOR_COUNT; m++) {
         const motor_hw_t *hw = &s_hw[m];
 
-        HAL_TIM_PWM_Start(hw->pwm_timer, hw->rpwm_channel);
-        HAL_TIM_PWM_Start(hw->pwm_timer, hw->lpwm_channel);
+        HAL_TIM_PWM_Start(hw->rpwm_timer, hw->rpwm_channel);
+        HAL_TIM_PWM_Start(hw->lpwm_timer, hw->lpwm_channel);
 
         s_state[m] = (MotorState){0};
         s_internal[m] = (motor_internal_t){0};

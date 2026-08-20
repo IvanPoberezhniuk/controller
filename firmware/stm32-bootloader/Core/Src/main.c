@@ -16,11 +16,13 @@ static void force_motor_outputs_safe(void)
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
 
-    /* Final OTA pin plan: PB8/PB9 become FDCAN RX/TX, so center enables move
-     * to PA4/PA5. External pull-downs remain mandatory for reset/power-up. */
+    /* Final OTA pin plan: center enables move to PA4/PA5 and center LPWM moves
+     * to PB8/TIM16_CH1, freeing PA11/PA12 for FDCAN. External pull-downs remain
+     * mandatory for reset/power-up. */
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4 | GPIO_PIN_5, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(GPIOB,
-                      GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_10 | GPIO_PIN_11,
+                      GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_8 | GPIO_PIN_10 |
+                          GPIO_PIN_11,
                       GPIO_PIN_RESET);
 
     GPIO_InitTypeDef outputs = {
@@ -30,7 +32,8 @@ static void force_motor_outputs_safe(void)
     };
     outputs.Pin = GPIO_PIN_4 | GPIO_PIN_5;
     HAL_GPIO_Init(GPIOA, &outputs);
-    outputs.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_10 | GPIO_PIN_11;
+    outputs.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_8 | GPIO_PIN_10 |
+                  GPIO_PIN_11;
     HAL_GPIO_Init(GPIOB, &outputs);
 }
 
