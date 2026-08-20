@@ -21,8 +21,8 @@ firmware and select only their role-specific configuration at build time.
 ```text
 firmware/
   stm32-common/  shared CubeMX/HAL and motor-control implementation
-  stm32-left/    left node identity, mux map and calibration signs
-  stm32-right/   right node identity, mux map and calibration signs
+  stm32-left/    left node identity and calibration signs
+  stm32-right/   right node identity and calibration signs
   esp32/         independent ESP-IDF project for Sixspan ESP32-S3-N16R8
 shared/can/      protocol IDs, payload types, explicit codec and DBC
 Tests/           host-side STM32 math and CAN codec tests

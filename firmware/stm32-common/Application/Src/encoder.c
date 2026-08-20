@@ -15,16 +15,13 @@ static const encoder_hw_t s_hw[UGV_MOTOR_COUNT] = {
     [MOTOR_REAR]   = { &htim4, 16u },
 };
 
-/* Sign applied to each motor's encoder delta so that positive drive
- * (RPWM active) reads as positive measured_rpm -- with the sign wrong the
- * PID sees inverted feedback and rails PWM to the cap instead of
- * regulating. Motor0's A/B wiring counts down when driving forward, so it
- * is flipped here rather than re-pinning the connector; verify motors 1/2
- * the same way during their bring-up. */
+/* Convert hardware counter polarity into the node's logical forward
+ * direction. The values live in the target config so left/right harness
+ * differences cannot drift into this shared implementation. */
 static const int32_t s_count_sign[UGV_MOTOR_COUNT] = {
-    [MOTOR_FRONT]  = -1,
-    [MOTOR_CENTER] = 1,
-    [MOTOR_REAR]   = 1,
+    [MOTOR_FRONT]  = UGV_ENCODER_FRONT_DIRECTION,
+    [MOTOR_CENTER] = UGV_ENCODER_CENTER_DIRECTION,
+    [MOTOR_REAR]   = UGV_ENCODER_REAR_DIRECTION,
 };
 
 /* Consecutive zero-delta ticks while the motor is actively commanded before

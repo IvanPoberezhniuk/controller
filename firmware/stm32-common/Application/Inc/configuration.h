@@ -9,6 +9,15 @@
 #error "UGV_NODE_ROLE must be defined to LEFT or RIGHT (see CMakeLists.txt UGV_NODE_ROLE option)"
 #endif
 
+#if (UGV_MOTOR_FRONT_DIRECTION != 1 && UGV_MOTOR_FRONT_DIRECTION != -1) || \
+    (UGV_MOTOR_CENTER_DIRECTION != 1 && UGV_MOTOR_CENTER_DIRECTION != -1) || \
+    (UGV_MOTOR_REAR_DIRECTION != 1 && UGV_MOTOR_REAR_DIRECTION != -1) || \
+    (UGV_ENCODER_FRONT_DIRECTION != 1 && UGV_ENCODER_FRONT_DIRECTION != -1) || \
+    (UGV_ENCODER_CENTER_DIRECTION != 1 && UGV_ENCODER_CENTER_DIRECTION != -1) || \
+    (UGV_ENCODER_REAR_DIRECTION != 1 && UGV_ENCODER_REAR_DIRECTION != -1)
+#error "Every motor/encoder direction must be +1 or -1"
+#endif
+
 #define UGV_MOTOR_COUNT 3
 
 /* Tunables, per ugv-telemetry-safety SKILL.md "Configuration management".

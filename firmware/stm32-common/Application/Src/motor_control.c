@@ -33,6 +33,12 @@ static const motor_hw_t s_hw[UGV_MOTOR_COUNT] = {
     },
 };
 
+static const int8_t s_drive_sign[UGV_MOTOR_COUNT] = {
+    [MOTOR_FRONT]  = UGV_MOTOR_FRONT_DIRECTION,
+    [MOTOR_CENTER] = UGV_MOTOR_CENTER_DIRECTION,
+    [MOTOR_REAR]   = UGV_MOTOR_REAR_DIRECTION,
+};
+
 /* TIM1/TIM15 ARR, both configured for the same 20 kHz PWM carrier
  * (Prescaler=0, Period=8499 at 170 MHz -- see MX_TIM1_Init/MX_TIM15_Init).
  * MUST be kept in sync with the Period in Core/Src/main.c whenever the
@@ -52,17 +58,18 @@ static motor_internal_t s_internal[UGV_MOTOR_COUNT];
 static void hw_write_pwm(motor_index_t motor, float pwm_command)
 {
     const motor_hw_t *hw = &s_hw[motor];
-    float magnitude = (pwm_command < 0.0f) ? -pwm_command : pwm_command;
+    float hardware_command = pwm_command * (float)s_drive_sign[motor];
+    float magnitude = (hardware_command < 0.0f) ? -hardware_command : hardware_command;
     uint32_t compare = (uint32_t)(magnitude * (float)PWM_ARR);
 
     if (compare > PWM_ARR) {
         compare = PWM_ARR;
     }
 
-    if (pwm_command > 0.0f) {
+    if (hardware_command > 0.0f) {
         __HAL_TIM_SET_COMPARE(hw->pwm_timer, hw->rpwm_channel, compare);
         __HAL_TIM_SET_COMPARE(hw->pwm_timer, hw->lpwm_channel, 0u);
-    } else if (pwm_command < 0.0f) {
+    } else if (hardware_command < 0.0f) {
         __HAL_TIM_SET_COMPARE(hw->pwm_timer, hw->rpwm_channel, 0u);
         __HAL_TIM_SET_COMPARE(hw->pwm_timer, hw->lpwm_channel, compare);
     } else {
