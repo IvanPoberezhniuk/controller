@@ -5,7 +5,7 @@ void current_monitor_init(void);
 
 /* Steps a CD74HC4067 16-channel analog mux through the 6 populated
  * current-sense channels (2 per motor, R_IS/L_IS) via ADC2's single MUX_SIG
- * input, converts to amps, and writes MotorState.current_a (max of
+ * input, converts to amps, and writes MotorState.current_a/current_valid (max of
  * R_IS/L_IS per motor -- whichever half-bridge is actively driving is the
  * meaningful one, the other reads ~0) via motor_control_get_state_mutable().
  * Software-triggered/polled, not DMA-driven, for this milestone; blocks for

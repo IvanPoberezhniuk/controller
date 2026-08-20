@@ -34,7 +34,7 @@ void fault_manager_update(void)
         float measured_mag = (st->measured_rpm < 0.0f) ? -st->measured_rpm : st->measured_rpm;
         float pwm_mag       = (st->pwm_command < 0.0f) ? -st->pwm_command : st->pwm_command;
 
-        if (st->current_a > cfg->stall_current_threshold_a) {
+        if (st->current_valid && st->current_a > cfg->stall_current_threshold_a) {
             st->overcurrent = true;
         }
 

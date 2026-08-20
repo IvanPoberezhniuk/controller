@@ -45,6 +45,7 @@ static void test_overcurrent_latches_while_disabled(void)
     reset_fixture();
     MotorState *motor = &s_motors[MOTOR_FRONT];
     motor->enabled = true;
+    motor->current_valid = true;
     motor->current_a = 11.0f;
 
     fault_manager_update();
@@ -56,6 +57,12 @@ static void test_overcurrent_latches_while_disabled(void)
     assert(motor->overcurrent);
 
     fault_manager_clear_latched();
+    assert(!motor->overcurrent);
+
+    motor->enabled = true;
+    motor->current_valid = false;
+    motor->current_a = 100.0f;
+    fault_manager_update();
     assert(!motor->overcurrent);
 }
 

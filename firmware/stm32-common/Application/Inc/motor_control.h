@@ -21,6 +21,8 @@ typedef struct {
     float pwm_command;   /* signed, -1..+1 fraction of max_pwm; sign = direction */
     float current_a;
     float temperature_c; /* not wired up yet -- no temp sensor configured this milestone */
+    bool current_valid;
+    bool temperature_valid;
 
     float pid_integral;
     float previous_error;

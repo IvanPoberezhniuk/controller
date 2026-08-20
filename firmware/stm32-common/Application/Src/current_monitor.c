@@ -25,6 +25,8 @@
 
 #if UGV_MUX_GPIO_CONFIGURED
 
+static bool s_adc_ready;
+
 static float counts_to_amps(uint32_t raw_counts)
 {
     float voltage = ((float)raw_counts / ADC_MAX_COUNT) * ADC_VREF_V;
@@ -40,14 +42,15 @@ static void mux_select(uint8_t channel)
     board_delay_us(MUX_SETTLE_US);
 }
 
-static uint32_t mux_read_raw(uint8_t channel)
+static bool mux_read_raw(uint8_t channel, uint32_t *raw)
 {
     mux_select(channel);
 
-    uint32_t raw = 0u;
+    bool valid = false;
     if (HAL_ADC_Start(&hadc2) == HAL_OK) {
         if (HAL_ADC_PollForConversion(&hadc2, ADC_POLL_TIMEOUT_MS) == HAL_OK) {
-            raw = HAL_ADC_GetValue(&hadc2);
+            *raw = HAL_ADC_GetValue(&hadc2);
+            valid = true;
         }
         HAL_ADC_Stop(&hadc2);
     }
@@ -58,31 +61,44 @@ static uint32_t mux_read_raw(uint8_t channel)
      * seconds at a time. Must be cleared explicitly; HAL does not do this
      * in polling mode. */
     __HAL_ADC_CLEAR_FLAG(&hadc2, ADC_FLAG_OVR);
-    return raw;
+    return valid;
 }
 
 void current_monitor_init(void)
 {
-    HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED);
+    s_adc_ready =
+        (HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED) == HAL_OK);
 }
 
 void current_monitor_sample(void)
 {
-    float ris_a[UGV_MOTOR_COUNT];
-    float lis_a[UGV_MOTOR_COUNT];
+    static const uint8_t ris_channel[UGV_MOTOR_COUNT] = {
+        UGV_MUX_CH_MOTOR0_RIS,
+        UGV_MUX_CH_MOTOR1_RIS,
+        UGV_MUX_CH_MOTOR2_RIS,
+    };
+    static const uint8_t lis_channel[UGV_MOTOR_COUNT] = {
+        UGV_MUX_CH_MOTOR0_LIS,
+        UGV_MUX_CH_MOTOR1_LIS,
+        UGV_MUX_CH_MOTOR2_LIS,
+    };
 
-    ris_a[MOTOR_FRONT]  = counts_to_amps(mux_read_raw(UGV_MUX_CH_MOTOR0_RIS));
-    lis_a[MOTOR_FRONT]  = counts_to_amps(mux_read_raw(UGV_MUX_CH_MOTOR0_LIS));
-    ris_a[MOTOR_CENTER] = counts_to_amps(mux_read_raw(UGV_MUX_CH_MOTOR1_RIS));
-    lis_a[MOTOR_CENTER] = counts_to_amps(mux_read_raw(UGV_MUX_CH_MOTOR1_LIS));
-    ris_a[MOTOR_REAR]   = counts_to_amps(mux_read_raw(UGV_MUX_CH_MOTOR2_RIS));
-    lis_a[MOTOR_REAR]   = counts_to_amps(mux_read_raw(UGV_MUX_CH_MOTOR2_LIS));
-
-    /* Whichever half-bridge is actively driving is the meaningful reading;
-     * the other side reads ~0. */
     for (motor_index_t m = 0; m < UGV_MOTOR_COUNT; m++) {
-        motor_control_get_state_mutable(m)->current_a =
-            (ris_a[m] > lis_a[m]) ? ris_a[m] : lis_a[m];
+        MotorState *state = motor_control_get_state_mutable(m);
+        uint32_t ris_raw = 0u;
+        uint32_t lis_raw = 0u;
+        bool valid = s_adc_ready &&
+            mux_read_raw(ris_channel[m], &ris_raw) &&
+            mux_read_raw(lis_channel[m], &lis_raw);
+
+        state->current_valid = valid;
+        if (valid) {
+            float ris_a = counts_to_amps(ris_raw);
+            float lis_a = counts_to_amps(lis_raw);
+            state->current_a = (ris_a > lis_a) ? ris_a : lis_a;
+        } else {
+            state->current_a = 0.0f;
+        }
     }
 }
 
@@ -97,6 +113,11 @@ void current_monitor_init(void)
 
 void current_monitor_sample(void)
 {
+    for (motor_index_t m = 0; m < UGV_MOTOR_COUNT; m++) {
+        MotorState *state = motor_control_get_state_mutable(m);
+        state->current_a = 0.0f;
+        state->current_valid = false;
+    }
 }
 
 #endif /* UGV_MUX_GPIO_CONFIGURED */

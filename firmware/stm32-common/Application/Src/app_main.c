@@ -100,11 +100,11 @@ static void print_telemetry(void)
     const MotorState *m0 = motor_control_get_state(MOTOR_FRONT);
     char buf[160];
     int len = snprintf(buf, sizeof(buf),
-        "seq=%lu tick=%lu state=%s m0 target=%.1f meas=%.1f pwm=%.2f cur=%.2f enc_ok=%d stall=%d\r\n",
+        "seq=%lu tick=%lu state=%s m0 target=%.1f meas=%.1f pwm=%.2f cur=%.2f cur_ok=%d enc_ok=%d stall=%d\r\n",
         (unsigned long)s_seq++, (unsigned long)HAL_GetTick(),
         safety_state_name(safety_get_state()),
         (double)m0->target_rpm, (double)m0->measured_rpm,
-        (double)m0->pwm_command, (double)m0->current_a,
+        (double)m0->pwm_command, (double)m0->current_a, m0->current_valid,
         m0->encoder_valid, m0->stalled);
     if (len > 0) {
         HAL_UART_Transmit(&huart2, (uint8_t *)buf, (uint16_t)len, 100u);
