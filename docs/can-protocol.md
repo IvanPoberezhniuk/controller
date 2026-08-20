@@ -20,9 +20,12 @@ prevents its message table from drifting from the header.
 
 | CAN ID | DLC | Message | Producer | Consumers |
 | ---: | ---: | --- | --- | --- |
-| 0x100 | 8 | Vehicle motion, signed RPM targets | Raspberry Pi | Both STM32 nodes |
-| 0x110 | 2 | Enable / emergency stop | Raspberry Pi | All control nodes |
+| 0x100 | 8 | Final vehicle motion, signed RPM targets | ESP32 | Both STM32 nodes |
+| 0x101 | 8 | Autonomous motion request | Raspberry Pi | ESP32 |
+| 0x110 | 2 | Final enable / emergency stop | ESP32 | Both STM32 nodes, Raspberry Pi |
+| 0x111 | 2 | Autonomous enable / emergency-stop request | Raspberry Pi | ESP32 |
 | 0x120 | 4 | Auxiliary lighting | Raspberry Pi | ESP32 AUX |
+| 0x130 | 8 | Active mode, source and CRSF link status | ESP32 | Raspberry Pi |
 | 0x180 / 0x181 | 8 | Local three-wheel RPM telemetry | Left / Right STM32 | Raspberry Pi, ESP32 |
 | 0x190 / 0x191 | 8 | Per-motor fault masks | Left / Right STM32 | Raspberry Pi, ESP32 |
 | 0x1A0 / 0x1A1 | 8 | Temperatures with validity mask | Left / Right STM32 | Raspberry Pi, ESP32 |
@@ -31,9 +34,16 @@ prevents its message table from drifting from the header.
 | 0x740 | 8 | Auxiliary-node heartbeat | ESP32 AUX | Raspberry Pi |
 
 All receivers reject an unexpected DLC and invalid bounded fields. Motion
-commands carry a sequence counter and must arrive every 10-20 ms. The current
-motor-node command timeout is 300 ms; adding the FDCAN transport must preserve
-the existing safe target reset and driver-disable behavior.
+commands carry a sequence counter and must arrive every 10-20 ms. The ESP32 is
+the only producer allowed to use the final command IDs `0x100` and `0x110`;
+Raspberry Pi sends requests on `0x101` and `0x111`. This prevents two normal
+software nodes from competing for motor authority on the same CAN IDs.
+
+The RC link timeout is 100 ms, the autonomous-request timeout is 300 ms, and
+the motor-node final-command timeout is 300 ms. Loss of the source selected by
+the operator causes a stop; it never automatically switches MANUAL/AUTO mode.
+Adding the FDCAN/TWAI transports must preserve the existing safe target reset
+and driver-disable behavior.
 
 An individual six-wheel target frame is intentionally not assigned yet: six
 signed 16-bit RPM values require 12 data bytes and do not fit in one Classic

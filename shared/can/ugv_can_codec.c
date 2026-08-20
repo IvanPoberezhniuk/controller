@@ -135,6 +135,55 @@ bool ugv_can_decode_aux_lighting(ugv_can_aux_lighting_t *message,
     return true;
 }
 
+static bool control_status_valid(const ugv_can_control_status_t *message)
+{
+    return message->selected_mode <= UGV_CAN_CONTROL_MODE_AUTO &&
+           message->active_source <= UGV_CAN_CONTROL_SOURCE_PI &&
+           message->enabled <= 1u && message->rc_link_up <= 1u &&
+           message->rc_failsafe <= 1u && message->link_quality_pct <= 100u;
+}
+
+bool ugv_can_encode_control_status(uint8_t *payload, size_t size,
+                                   const ugv_can_control_status_t *message)
+{
+    if (!can_encode(payload, size, message, UGV_CAN_CONTROL_STATUS_DLC) ||
+        !control_status_valid(message)) {
+        return false;
+    }
+    payload[0] = message->sequence;
+    payload[1] = message->selected_mode;
+    payload[2] = message->active_source;
+    payload[3] = message->enabled;
+    payload[4] = message->rc_link_up;
+    payload[5] = message->rc_failsafe;
+    payload[6] = message->link_quality_pct;
+    payload[7] = (uint8_t)message->rssi_dbm;
+    return true;
+}
+
+bool ugv_can_decode_control_status(ugv_can_control_status_t *message,
+                                   const uint8_t *payload, size_t size)
+{
+    ugv_can_control_status_t decoded;
+
+    if (!can_decode(message, payload, size, UGV_CAN_CONTROL_STATUS_DLC)) {
+        return false;
+    }
+    decoded.sequence = payload[0];
+    decoded.selected_mode = payload[1];
+    decoded.active_source = payload[2];
+    decoded.enabled = payload[3];
+    decoded.rc_link_up = payload[4];
+    decoded.rc_failsafe = payload[5];
+    decoded.link_quality_pct = payload[6];
+    decoded.rssi_dbm = (int8_t)payload[7];
+    if (!control_status_valid(&decoded)) {
+        return false;
+    }
+    *message = decoded;
+    return true;
+}
+
 bool ugv_can_encode_motor_telemetry(uint8_t *payload, size_t size,
                                     const ugv_can_motor_telemetry_t *message)
 {

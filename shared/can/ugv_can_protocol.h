@@ -11,12 +11,14 @@
  */
 
 #define UGV_CAN_PROTOCOL_VERSION_MAJOR 1u
-#define UGV_CAN_PROTOCOL_VERSION_MINOR 1u
+#define UGV_CAN_PROTOCOL_VERSION_MINOR 2u
 
 #define UGV_CAN_BITRATE_BPS             500000u
 #define UGV_CAN_COMMAND_PERIOD_MS_MIN   10u
 #define UGV_CAN_COMMAND_PERIOD_MS_MAX   20u
 #define UGV_CAN_COMMAND_TIMEOUT_MS      300u
+#define UGV_CAN_RC_LINK_TIMEOUT_MS      100u
+#define UGV_CAN_AUTO_REQUEST_TIMEOUT_MS 300u
 
 typedef enum {
     UGV_CAN_NODE_LEFT        = 0x10,
@@ -29,8 +31,11 @@ typedef enum {
 /* symbol, DBC message name, standard 11-bit CAN ID, DLC */
 #define UGV_CAN_MESSAGE_TABLE(X) \
     X(VEHICLE_MOTION,  VehicleMotion,  0x100, 8u) \
+    X(AUTO_MOTION_REQUEST, AutoMotionRequest, 0x101, 8u) \
     X(SYSTEM_ENABLE,   SystemEnable,   0x110, 2u) \
+    X(AUTO_ENABLE_REQUEST, AutoEnableRequest, 0x111, 2u) \
     X(AUX_LIGHTING,    AuxLighting,    0x120, 4u) \
+    X(CONTROL_STATUS,  ControlStatus,  0x130, 8u) \
     X(TELEMETRY_LEFT,  TelemetryLeft,  0x180, 8u) \
     X(TELEMETRY_RIGHT, TelemetryRight, 0x181, 8u) \
     X(FAULT_LEFT,      FaultLeft,      0x190, 8u) \
@@ -54,7 +59,11 @@ enum {
 #undef UGV_CAN_DECLARE_DLC
 };
 
-/* 0x100, Raspberry Pi -> both motor nodes. Targets are signed RPM. */
+/*
+ * 0x100 ESP32 -> both motor nodes (final command), and
+ * 0x101 Raspberry Pi -> ESP32 (AUTO request).
+ * Both use the same signed-RPM payload. Only the ESP32 may produce 0x100.
+ */
 typedef struct {
     uint8_t sequence;
     uint8_t mode_flags;
@@ -64,7 +73,11 @@ typedef struct {
     uint8_t reserved;
 } ugv_can_motion_cmd_t;
 
-/* 0x110, Raspberry Pi -> all control nodes. */
+/*
+ * 0x110 ESP32 -> motor nodes (final state), and
+ * 0x111 Raspberry Pi -> ESP32 (AUTO request).
+ * Both use the same payload. Only the ESP32 may produce 0x110.
+ */
 typedef struct {
     uint8_t enabled;
     uint8_t emergency_stop;
@@ -77,6 +90,30 @@ typedef struct {
     uint8_t left_indicator;
     uint8_t right_indicator;
 } ugv_can_aux_lighting_t;
+
+typedef enum {
+    UGV_CAN_CONTROL_MODE_DISABLED = 0,
+    UGV_CAN_CONTROL_MODE_MANUAL   = 1,
+    UGV_CAN_CONTROL_MODE_AUTO     = 2,
+} ugv_can_control_mode_t;
+
+typedef enum {
+    UGV_CAN_CONTROL_SOURCE_NONE = 0,
+    UGV_CAN_CONTROL_SOURCE_RC   = 1,
+    UGV_CAN_CONTROL_SOURCE_PI   = 2,
+} ugv_can_control_source_t;
+
+/* 0x130, ESP32 -> Raspberry Pi. CRSF link and command-arbiter status. */
+typedef struct {
+    uint8_t sequence;
+    uint8_t selected_mode;
+    uint8_t active_source;
+    uint8_t enabled;
+    uint8_t rc_link_up;
+    uint8_t rc_failsafe;
+    uint8_t link_quality_pct;
+    int8_t rssi_dbm;
+} ugv_can_control_status_t;
 
 /* 0x180/0x181, motor node -> Raspberry Pi/ESP32. */
 typedef struct {

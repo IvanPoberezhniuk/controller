@@ -52,6 +52,30 @@ static void test_aux_lighting(void)
     assert(memcmp(&decoded, &source, sizeof(source)) == 0);
 }
 
+static void test_control_status(void)
+{
+    const ugv_can_control_status_t source = {
+        .sequence = 19u,
+        .selected_mode = UGV_CAN_CONTROL_MODE_MANUAL,
+        .active_source = UGV_CAN_CONTROL_SOURCE_RC,
+        .enabled = 1u,
+        .rc_link_up = 1u,
+        .rc_failsafe = 0u,
+        .link_quality_pct = 87u,
+        .rssi_dbm = -74,
+    };
+    uint8_t payload[UGV_CAN_CONTROL_STATUS_DLC] = {0};
+    ugv_can_control_status_t decoded = {0};
+
+    assert(ugv_can_encode_control_status(payload, sizeof(payload), &source));
+    assert(payload[7] == (uint8_t)-74);
+    assert(ugv_can_decode_control_status(&decoded, payload, sizeof(payload)));
+    assert(memcmp(&decoded, &source, sizeof(source)) == 0);
+
+    payload[6] = 101u;
+    assert(!ugv_can_decode_control_status(&decoded, payload, sizeof(payload)));
+}
+
 static void test_motor_telemetry(void)
 {
     const ugv_can_motor_telemetry_t source = {7u, 4u, -10, 20, 333};
@@ -121,6 +145,7 @@ int main(void)
     test_motion();
     test_system_enable();
     test_aux_lighting();
+    test_control_status();
     test_motor_telemetry();
     test_fault_report();
     test_temperatures();
