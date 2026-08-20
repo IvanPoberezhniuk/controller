@@ -4,8 +4,9 @@ This file is the harness reference for the current architecture. Label both
 ends of every wire with the signal name; color alone is not an identifier.
 
 `FINAL` means the pin is already represented in source/configuration.
-`TBD CubeMX` means do not build that part of the harness until the STM32 `.ioc`
-has been configured and regenerated.
+`PLANNED CubeMX` means the allocation is fixed in the bootloader and hand-written
+code, but the generated STM32 `.ioc` still needs the documented manual edit.
+Do not power the motor harness until that regeneration is complete.
 
 ## System interconnect
 
@@ -164,7 +165,7 @@ Both STM32G431 nodes use the same MCU pin layout. `motor0` means front,
 `motor1` center, and `motor2` rear. The Left board connects those signals to
 the three left wheels; the Right board connects them to the three right wheels.
 
-### Encoder and motor-driver pins already generated
+### Encoder and final motor-driver pin plan
 
 | Motor | Function | STM32 pin | Motor harness color | Status |
 | --- | --- | --- | --- | --- |
@@ -177,9 +178,9 @@ the three left wheels; the Right board connects them to the three right wheels.
 | Center / motor1 | Encoder A | `PB4` | Brown | FINAL |
 | Center / motor1 | Encoder B | `PB5` | Pink | FINAL |
 | Center / motor1 | RPWM | `PA10` | Orange | FINAL |
-| Center / motor1 | LPWM | `PA11` | Yellow | FINAL |
-| Center / motor1 | R_EN | `PB8` | Green | FINAL |
-| Center / motor1 | L_EN | `PB9` | Blue | FINAL |
+| Center / motor1 | LPWM | `PB8` (`TIM16_CH1`) | Yellow | PLANNED CubeMX |
+| Center / motor1 | R_EN | `PA4` | Green | PLANNED CubeMX |
+| Center / motor1 | L_EN | `PA5` | Blue | PLANNED CubeMX |
 | Rear / motor2 | Encoder A | `PB6` | Brown | FINAL |
 | Rear / motor2 | Encoder B | `PB7` | Pink | FINAL |
 | Rear / motor2 | RPWM | `PB14` | Orange | FINAL |
@@ -215,23 +216,53 @@ voltage range stays within `0-3.3 V`. Add dividers, buffers, and input
 protection as required by the final motor driver and temperature sensor; the
 multiplexer itself does not make a 5 V signal safe for the STM32 ADC.
 
-The STM32 pins for MUX `S0`, `S1`, `S2`, `S3`, `SIG`, and FDCAN `TX/RX` are
-`TBD CubeMX`. Do not wire them yet. The existing direct ADC labels in generated
-`main.h` describe the legacy pre-multiplexer state and are not the final
-harness. After the manual CubeMX assignment, update this table and
-`docs/pinout-stm32-left.md` / `docs/pinout-stm32-right.md` in the same commit.
+### CD74HC4067 control and ADC wiring
+
+| CD74HC4067 | STM32 pin | Color | Status / note |
+| --- | --- | --- | --- |
+| `SIG` | `PA6 / ADC2_IN3` | White | PLANNED CubeMX; single-ended ADC input |
+| `S0` | `PA7` | Blue | PLANNED CubeMX; GPIO output, initial low |
+| `S1` | `PB2` | Green | PLANNED CubeMX; GPIO output, initial low |
+| `S2` | `PB12` | Yellow | PLANNED CubeMX; GPIO output, initial low |
+| `S3` | `PB13` | Violet | PLANNED CubeMX; GPIO output, initial low |
+| `EN` | `GND` | Black | Always enabled |
+| `VCC` | `3V3` | Red, label `3V3` | 100 nF local decoupling |
+| `GND` | `GND` | Black | Same analog reference as STM32 |
+
+The generated `main.h` currently contains legacy direct-ADC labels. They are
+not the final harness. Enable `UGV_MUX_GPIO_CONFIGURED` only after CubeMX has
+generated `MUX_SIG` and `MUX_S0` through `MUX_S3` exactly as above.
+
+### STM32 CAN transceiver
+
+| From | To | Color | Status / note |
+| --- | --- | --- | --- |
+| STM32 `PA12 / FDCAN1_TX` | Transceiver `TXD` | Orange | PLANNED CubeMX |
+| Transceiver `RXD` | STM32 `PA11 / FDCAN1_RX` | White | PLANNED CubeMX |
+| STM32 `3V3` | Transceiver `VCC/VIO` | Red, label `3V3` | Use 3.3 V-compatible logic |
+| STM32 `GND` | Transceiver `GND` | Black | Common signal reference |
+| Transceiver `CANH` | CAN-H trunk | Yellow | Twisted with CAN-L |
+| Transceiver `CANL` | CAN-L trunk | Green | Twisted with CAN-H |
+
+PA11/PA12 connect only to the transceiver logic pins, never directly to
+CAN-H/CAN-L. The bootloader already configures these pins; the application
+starts using them after the manual CubeMX migration.
 
 ### STM32 service connections
 
 | Function | STM32 pin | Color | Status |
 | --- | --- | --- | --- |
-| Debug UART TX | `PA2` | White | Current bench interface |
-| Debug UART RX | `PA3` | Orange | Current bench interface |
-| SWDIO | `PA13` | Blue | Programming/debug |
-| SWCLK | `PA14` | Yellow | Programming/debug |
-| NRST | `NRST` | White | Programming/debug |
+| USART2 TX / adapter RX | `PA2` | Orange | Console and factory ROM provisioning |
+| USART2 RX / adapter TX | `PA3` | White | Console and factory ROM provisioning |
+| BOOT0 jumper to `3V3` | `PB8` | Violet | Provisioning only; normally open, 10 kohm pull-down |
+| SWDIO | `PA13` | Blue | Optional debug/recovery test pad |
+| SWCLK | `PA14` | Yellow | Optional debug/recovery test pad |
+| NRST | `NRST` | Gray | Reset/programming test point |
 | Ground | `GND` | Black | Programming/debug reference |
-| FDCAN TX/RX | `TBD CubeMX` | Orange / White | Do not wire yet |
+
+PB8 is both BOOT0 and the final center `LPWM`. Never fit the BOOT0 jumper while
+motor power is connected. For first programming without ST-Link, follow
+[`firmware-update.md`](firmware-update.md).
 
 ## CAN trunk
 
