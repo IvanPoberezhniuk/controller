@@ -44,6 +44,7 @@ static const int32_t s_count_sign[UGV_MOTOR_COUNT] = {
 typedef struct {
     uint32_t last_count;
     uint32_t frozen_ticks;
+    bool     fault_latched;
     int32_t  delta_window[SPEED_WINDOW_TICKS];
     uint32_t window_index;
     int32_t  window_sum;
@@ -57,6 +58,7 @@ void encoder_init(void)
         HAL_TIM_Encoder_Start(s_hw[m].timer, TIM_CHANNEL_ALL);
         s_internal[m].last_count = __HAL_TIM_GET_COUNTER(s_hw[m].timer);
         s_internal[m].frozen_ticks = 0u;
+        s_internal[m].fault_latched = false;
     }
 }
 
@@ -99,6 +101,18 @@ void encoder_update(float dt_s)
             in->frozen_ticks = 0u;
         }
 
-        st->encoder_valid = (in->frozen_ticks < ENCODER_STALL_TICKS);
+        if (in->frozen_ticks >= ENCODER_STALL_TICKS) {
+            in->fault_latched = true;
+        }
+        st->encoder_valid = !in->fault_latched;
+    }
+}
+
+void encoder_clear_latched_faults(void)
+{
+    for (motor_index_t m = 0; m < UGV_MOTOR_COUNT; m++) {
+        s_internal[m].frozen_ticks = 0u;
+        s_internal[m].fault_latched = false;
+        motor_control_get_state_mutable(m)->encoder_valid = true;
     }
 }

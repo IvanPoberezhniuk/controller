@@ -92,12 +92,6 @@ static void poll_uart_rx(void)
     }
 }
 
-static bool control_loop_healthy(void)
-{
-    safety_state_t state = safety_get_state();
-    return state != SAFETY_STATE_FAULT && state != SAFETY_STATE_EMERGENCY_STOP;
-}
-
 static void print_telemetry(void)
 {
     static uint32_t s_seq = 0;
@@ -149,9 +143,10 @@ void app_main_run(void)
     safety_update();
     motor_control_step(dt_s);
 
-    if (control_loop_healthy()) {
-        watchdog_refresh();
-    }
+    /* FAULT and EMERGENCY_STOP are healthy, intentional safety states. The
+     * watchdog is refreshed after a complete control iteration and is starved
+     * only if the loop actually stops making progress. */
+    watchdog_refresh();
 
     static uint32_t s_telemetry_divider = 0;
     if (++s_telemetry_divider >= (TIMEBASE_CONTROL_LOOP_HZ / 4u)) {

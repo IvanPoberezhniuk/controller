@@ -3,8 +3,7 @@
 #include "configuration.h"
 #include "timebase.h"
 
-/* Algorithm-internal epsilons, not deployment tunables -- see
- * ugv-stm32-firmware SKILL.md "Stall detection". */
+/* Algorithm-internal epsilons, not deployment tunables. */
 #define STALL_TARGET_RPM_MIN    5.0f
 #define STALL_MEASURED_RPM_MAX  2.0f
 
@@ -28,8 +27,6 @@ void fault_manager_update(void)
 
         if (!st->enabled) {
             s_stall_ticks[m] = 0u;
-            st->stalled = false;
-            st->overcurrent = false;
             continue;
         }
 
@@ -37,7 +34,9 @@ void fault_manager_update(void)
         float measured_mag = (st->measured_rpm < 0.0f) ? -st->measured_rpm : st->measured_rpm;
         float pwm_mag       = (st->pwm_command < 0.0f) ? -st->pwm_command : st->pwm_command;
 
-        st->overcurrent = (st->current_a > cfg->stall_current_threshold_a);
+        if (st->current_a > cfg->stall_current_threshold_a) {
+            st->overcurrent = true;
+        }
 
         bool driving_but_not_turning =
             (target_mag > STALL_TARGET_RPM_MIN) &&
@@ -52,11 +51,19 @@ void fault_manager_update(void)
             s_stall_ticks[m] = 0u;
         }
 
-        bool stalled = (s_stall_ticks[m] >= stall_ticks_threshold);
-        st->stalled = stalled;
-
-        if (stalled) {
+        if (s_stall_ticks[m] >= stall_ticks_threshold) {
+            st->stalled = true;
             motor_control_set_enabled(m, false);
         }
+    }
+}
+
+void fault_manager_clear_latched(void)
+{
+    for (motor_index_t m = 0; m < UGV_MOTOR_COUNT; m++) {
+        MotorState *st = motor_control_get_state_mutable(m);
+        s_stall_ticks[m] = 0u;
+        st->stalled = false;
+        st->overcurrent = false;
     }
 }

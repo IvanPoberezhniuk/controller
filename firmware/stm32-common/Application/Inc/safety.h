@@ -3,9 +3,9 @@
 
 #include <stdbool.h>
 
-/* Safety state machine per ugv-telemetry-safety SKILL.md. Motor outputs are
- * forced disabled in BOOT/DISABLED/ARMING/FAULT/EMERGENCY_STOP; only
- * READY/ACTIVE/DEGRADED allow motor_control to drive outputs. */
+/* Motor outputs are forced disabled in BOOT/DISABLED/ARMING/FAULT/
+ * EMERGENCY_STOP; only READY/ACTIVE/DEGRADED allow motor_control to drive
+ * outputs. */
 typedef enum {
     SAFETY_STATE_BOOT = 0,
     SAFETY_STATE_DISABLED,
@@ -27,9 +27,7 @@ safety_state_t safety_get_state(void);
 const char *safety_state_name(safety_state_t state);
 
 /* Stand-in for "valid CAN communication" / "fresh command source" until the
- * CAN milestone: call this whenever a valid command is received over the
- * debug UART. Command-timeout escalation (per ugv-can-protocol SKILL.md,
- * "must not continue using last command indefinitely") uses this. */
+ * CAN milestone: call this whenever a valid command is received. */
 void safety_notify_command_received(void);
 
 /* Explicit re-arm request. After any reset or fault, the system stays
@@ -43,8 +41,9 @@ void safety_request_emergency_stop(void);
  * still returns to DISABLED and requires safety_request_arm() again. */
 void safety_clear_emergency_stop(void);
 
-/* Clears a FAULT latch (e.g. after a stall or comms-loss fault has been
- * addressed). Returns to DISABLED, not directly to READY/ACTIVE. */
+/* Clears latched motor/encoder faults from DEGRADED/FAULT/DISABLED after the
+ * cause has been addressed. Returns to or remains in DISABLED and never
+ * re-arms by itself. */
 void safety_clear_fault(void);
 
 #endif /* APPLICATION_SAFETY_H */

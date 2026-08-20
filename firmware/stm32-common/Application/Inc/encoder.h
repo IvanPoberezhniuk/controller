@@ -9,4 +9,8 @@ void encoder_init(void);
  * control-loop tick, same rate/phase as motor_control_step(). */
 void encoder_update(float dt_s);
 
+/* Clears a previously latched disconnected/frozen-encoder fault. Called only
+ * by the safety state machine while motor outputs are disabled. */
+void encoder_clear_latched_faults(void);
+
 #endif /* APPLICATION_ENCODER_H */
