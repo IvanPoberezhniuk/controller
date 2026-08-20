@@ -28,6 +28,8 @@ shared/can/      protocol IDs, payload types, explicit codec and DBC
 Tests/           host-side STM32 math and CAN codec tests
 docs/            architecture, wiring, pinouts and CubeMX notes
 tools/           build, flash and serial-console PowerShell scripts
+CLAUDE.md         versioned engineering/agent instructions and decision index
+.claude/skills/   subsystem decision records and unresolved hardware choices
 ```
 
 `F:\work\academy\blinkESP32` is not part of this repository and remains an
