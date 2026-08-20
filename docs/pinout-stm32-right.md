@@ -14,8 +14,12 @@ Logical motors:
 
 The local CD74HC4067 maps R_IS/L_IS for the three motors to channels 0-5 and
 the three motor-temperature inputs to channels 6-8. Motor and encoder signs
-remain neutral defaults until verified on the assembled right drivetrain.
-Final S0-S3, SIG, and FDCAN pins must be assigned in CubeMX before
-current/CAN hardware bring-up.
-See `docs/wiring.md` for the shared motor/encoder pin table, multiplexer
-channels, connector colors, and the signals that remain `TBD CubeMX`.
+remain neutral defaults until verified on the assembled right drivetrain. The
+final planned control pins are PA6=`MUX_SIG`, PA7=`S0`, PB2=`S1`, PB12=`S2`,
+PB13=`S3`. FDCAN uses PA11=RX and PA12=TX; center LPWM moves to PB8/TIM16_CH1
+and center enables move to PA4/PA5. These assignments still require the manual
+CubeMX regeneration.
+
+The role-specific bootloader is `UGV_BOOTLOADER_RIGHT.bin`; its CAN data/status
+IDs are `0x611`/`0x681`. See `docs/wiring.md` for the full shared pin/color
+table and `docs/firmware-update.md` for provisioning and OTA commands.
