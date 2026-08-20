@@ -8,11 +8,6 @@ set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
-# Link directories setup
-target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user defined library search paths
-)
-
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/app_main.c
@@ -42,12 +37,4 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     UGV_NODE_ROLE_${UGV_NODE_ROLE_UPPER}
 )
 
-# Remove wrong libob.a library dependency when using cpp files
-list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
-
-# Add linked libraries
-target_link_libraries(${CMAKE_PROJECT_NAME}
-    stm32cubemx
-
-    # Add user defined libraries
-)
+target_link_libraries(${CMAKE_PROJECT_NAME} stm32cubemx)

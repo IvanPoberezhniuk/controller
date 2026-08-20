@@ -21,8 +21,7 @@ endif()
 set(CMAKE_PROJECT_NAME "UGV_STM32_${UGV_NODE_ROLE_UPPER}")
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
-project(${CMAKE_PROJECT_NAME})
-enable_language(C ASM)
+project(${CMAKE_PROJECT_NAME} LANGUAGES C ASM)
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "STM32 motor node: ${UGV_NODE_ROLE_UPPER}")

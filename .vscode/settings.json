@@ -5,6 +5,5 @@
     ],
     "cmake.preferredGenerators": [
         "Ninja"
-    ],
-    "stm32cube-ide-clangd.path": "cube"
+    ]
 }
