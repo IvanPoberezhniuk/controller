@@ -1,8 +1,45 @@
 # CubeMX Configuration Reference — STM32G431CBT6 UGV Motor Node
 
-Every parameter set in `firmware/stm32-common/UGV_MotorNode.ioc` for this board, and why. Written
-as a learning reference after building this project's Milestone 1
-(one node, three motors, no CAN yet) — see `CLAUDE.md` for the wider project.
+This is the manual CubeMX checklist for the shared STM32G431CBT6 motor-node
+project. Left and Right use the same `.ioc`; role-specific behavior is selected
+by the CMake preset. The checked-in `.ioc` still contains the legacy direct-ADC
+and pre-CAN pinout and is intentionally not modified by the OTA implementation.
+
+## Required final pin migration
+
+Make these changes together in `firmware/stm32-common/UGV_MotorNode.ioc`. A
+partial migration creates pin conflicts or drives the center motor incorrectly.
+
+1. In TIM1 disable PWM Generation CH4 on PA11. Keep CH1/CH2/CH3 on
+   PA8/PA9/PA10.
+2. Enable TIM16, internal clock, PWM Generation CH1 on PB8. Set Prescaler `0`,
+   Counter Period `8499`, Pulse `0`, PWM mode 1, active-high. Label it
+   `MOTOR1_LPWM`.
+3. Move center-driver enables to PA4=`MOTOR1_R_EN` and
+   PA5=`MOTOR1_L_EN`. Configure both as push-pull outputs, no pull, low speed,
+   initial output low. PB9 becomes free.
+4. Replace the legacy ADC scan with one ADC2 single-ended regular channel:
+   PA6=`ADC2_IN3`, label `MUX_SIG`, one conversion, software trigger,
+   non-continuous mode. Start with 92.5-cycle sampling time.
+5. Configure PA7=`MUX_S0`, PB2=`MUX_S1`, PB12=`MUX_S2`, and PB13=`MUX_S3`
+   as push-pull GPIO outputs, initial low.
+6. Disable ADC1 after removing its old PB12 direct current-sense channel.
+7. Enable FDCAN1 in Classic CAN normal mode on PA11=`FDCAN1_RX` and
+   PA12=`FDCAN1_TX`, using the exact timing in the FDCAN section below.
+8. Set the standard-filter count to at least `1`, RX FIFO0 to at least one
+   8-byte element, and TX FIFO/queue to at least one 8-byte element. The
+   temporary application update service uses standard filter index 0.
+9. Generate code with **Keep User Code when re-generating** enabled. Confirm
+   `MX_TIM16_Init()` and `MX_FDCAN1_Init()` are called before
+   `app_main_init()`.
+10. Only after the generated code builds, change
+    `UGV_MUX_GPIO_CONFIGURED` to `1` in
+    `Application/Inc/node_common_config.h` and build OTA images with
+    `tools/build-update-images.ps1 -FinalPinout`.
+
+The custom bootloader does not use this CubeMX initialization. It configures
+HSI16, PA11/PA12, FDCAN, flash, and safe output levels independently, so it
+remains a recovery path even if an application image is broken.
 
 ## MCU and project settings
 
@@ -16,7 +53,7 @@ as a learning reference after building this project's Milestone 1
 
 | Setting | Value | Why |
 |---|---|---|
-| SYSCLK source | HSI16 (internal 16 MHz RC) → PLL → 170 MHz | Raised from the initial no-PLL 16 MHz bring-up clock to the STM32G431's maximum-performance operating point once bring-up was working. PLL path: `/M=4` (16 MHz/4 = 4 MHz PLL input, within the 2.66–16 MHz valid range) → `×N=85` (4 MHz×85 = 340 MHz VCO, within the 96–344 MHz valid range) → `/R=2` (340/2 = 170 MHz SYSCLK). `PLLP`/`PLLQ` also come out at 170 MHz but are currently unused (no ADC-via-PLLP or FDCAN-via-PLLQ configured yet). |
+| SYSCLK source | HSI16 (internal 16 MHz RC) → PLL → 170 MHz | Raised from the initial no-PLL 16 MHz bring-up clock to the STM32G431's maximum-performance operating point once bring-up was working. PLL path: `/M=4` (16 MHz/4 = 4 MHz PLL input, within the 2.66–16 MHz valid range) → `×N=85` (4 MHz×85 = 340 MHz VCO, within the 96–344 MHz valid range) → `/R=2` (340/2 = 170 MHz SYSCLK). `PLLP`/`PLLQ` also come out at 170 MHz but remain unused; FDCAN uses PCLK1. |
 | Voltage scaling | Range 1 Boost | 170 MHz is only reachable in Boost mode — normal Range 1 tops out at 150 MHz. |
 | Flash latency | 4 wait states | Required at 170 MHz in Range 1 Boost per the reference manual's wait-state table (0 WS up to 34 MHz, ..., 4 WS up to 170 MHz). |
 | AHB/APB1/APB2 prescalers | All ÷1 (undivided) | Keeps every peripheral clock at a single known value (170 MHz) — makes all the timer-period math below straightforward (still one number, just a different one than the original 16 MHz). |
@@ -32,14 +69,22 @@ project directly: after moving to 170 MHz, TIM1/TIM15's PWM period was
 still the old 16 MHz-derived value (see below) and TIM6's control-loop
 tick was silently running ~10.6x too fast until caught and fixed.
 
-## TIM1 — motor0 + motor1 PWM
+## TIM1 — front PWM plus center RPWM
 
 | Field | Value | Why |
 |---|---|---|
-| Channel1–4 | PWM Generation CH1/CH2/CH3/CH4 | TIM1 is an advanced timer with 4 independent compare channels — enough to cover two motors' RPWM+LPWM (2 channels each) from one timer. CH1/CH2 → motor0 RPWM/LPWM (PA8/PA9); CH3/CH4 → motor1 RPWM/LPWM (PA10/PA11). |
+| Channels 1–3 | PWM Generation CH1/CH2/CH3 | CH1/CH2 drive front RPWM/LPWM on PA8/PA9. CH3 drives center RPWM on PA10. CH4 must be disabled so PA11 can be FDCAN1_RX. |
 | Clock Source | Internal Clock | Without this, the timer has no clock at all and won't count — easy to miss because CubeMX will still generate PWM channel config code even with the timer unclocked. |
-| Prescaler | 0 | No division — full 16 MHz timer clock. |
+| Prescaler | 0 | No division — full 170 MHz timer clock. |
 | Counter Period (ARR) | 8499 | `170,000,000 / 20,000 Hz − 1 = 8499` at the current 170 MHz timer clock. 20 kHz is a common brushed-DC PWM carrier frequency: high enough to be inaudible/efficient, comfortably within the BTS7960 driver's switching range. (Was `799` back when SYSCLK was 16 MHz with no PLL — recomputed after the clock change; the target frequency, 20 kHz, didn't change, only the register value needed to hit it. Bonus of the higher clock: duty-cycle resolution improved from 800 steps to 8500 steps.) |
+
+## TIM16 — center LPWM
+
+| Field | Value | Why |
+|---|---|---|
+| Channel 1 | PWM Generation CH1 on PB8 | Replaces TIM1_CH4/PA11 and frees PA11 for FDCAN RX. PB8 also serves as BOOT0 during one-time provisioning. |
+| Clock source | Internal clock | Uses the same 170 MHz timer clock as TIM1. |
+| Prescaler / Period / Pulse | `0` / `8499` / `0` | 20 kHz, initially zero duty. Application code uses `htim16` only when `UGV_FINAL_OTA_PINOUT_CONFIGURED=1`. |
 
 ## TIM15 — motor2 PWM
 
@@ -79,9 +124,11 @@ general-purpose timers convenient for this on one chip.
 | Baud rate | 115200 | Standard, fast-enough default for a text console; not a bandwidth-critical link. |
 | Word length / parity / stop bits | 8 / None / 1 | Standard "8N1" — the near-universal default for serial consoles. |
 
-USART2 stands in for the eventual CAN command/telemetry link during
-bring-up (no FDCAN configured yet — that's a later milestone once the
-external CAN transceiver hardware is selected).
+USART2 remains the bench console and is also the supported one-time path into
+the STM32 factory ROM bootloader. Application commands and OTA updates use
+FDCAN after the final migration. The application console is 8N1; the ROM
+bootloader protocol uses even parity, which STM32CubeProgrammer selects for the
+factory-provisioning session.
 
 ## IWDG — independent watchdog
 
@@ -141,8 +188,8 @@ pin assignment is complete.
 |---|---|---|
 | PB0 | `MOTOR0_R_EN` | Free GPIO, avoided debug (PA13/PA14), oscillator (PC14/15), and SWO (PB3) pins. |
 | PB1 | `MOTOR0_L_EN` | Same reasoning, adjacent pin for a clean layout. |
-| PB8 | `MOTOR1_R_EN` | Free GPIO after TIM1/TIM2/USART2/ADC pins were claimed. |
-| PB9 | `MOTOR1_L_EN` | Same. |
+| PA4 | `MOTOR1_R_EN` | Final center R_EN; becomes free when the legacy ADC2_IN17 channel is removed. |
+| PA5 | `MOTOR1_L_EN` | Final center L_EN; becomes free when the legacy ADC2_IN13 channel is removed. |
 | PB10 | `MOTOR2_R_EN` (intended) | Free GPIO — but the CubeMX **User Label never actually got set** on this pin despite repeated attempts, so `main.h` has no macro for it. Firmware works around this directly (`firmware/stm32-common/Platform/Inc/board.h` defines `MOTOR2_R_EN_REAL_Pin`/`_GPIO_Port` pointing at `GPIOB`/`GPIO_PIN_10` explicitly). Worth fixing properly next time the `.ioc` is regenerated: click PB10, re-enter the User Label. |
 | PB11 | `MOTOR2_L_EN` | Free GPIO. |
 
@@ -167,11 +214,23 @@ disabled independently without cutting power to the other two.
 5. **Encoder Mode has three options (TI1 / TI2 / TI1 and TI2)** that all "work" (compile, no CubeMX warning) but only "TI1 and TI2" gives full quadrature resolution — the other two silently halve it.
 6. **Raising SYSCLK in CubeMX does not recompute every raw peripheral field.** Re-check ADC and PWM settings after a clock-tree change. Application PWM writes read the live timer ARR, and TIM6 derives its runtime prescaler/ARR from APB1, so those consumers no longer duplicate the 170 MHz literal.
 
-## Future: FDCAN clock (not configured yet)
+## FDCAN1 — motor network and firmware update
 
-`PLLQ` now outputs 170 MHz alongside `PLLR`/`PLLP`, and is available as an
-FDCAN kernel-clock source once the CAN milestone starts. No FDCAN bit-rate
-math has been done yet — when it is, derive it from whichever clock source
-gets selected at that time (likely `PLLQ` or `PCLK1`, both 170 MHz here),
-not from the original 16 MHz assumption this document was first written
-against.
+| Field | Value | Why |
+|---|---|---|
+| Pins | PA11 RX, PA12 TX | Keeps CAN away from PB8/BOOT0 and matches the custom bootloader. |
+| Kernel clock | PCLK1, 170 MHz | Already available with the current undivided clock tree. |
+| Frame format / mode | Classic CAN / Normal | Compatible with Raspberry Pi CAN and ESP32 TWAI on the shared bus. |
+| Auto retransmission | Enabled | Hardware retries arbitration/errors; higher-level OTA sequence ACK still handles lost windows. |
+| Nominal prescaler | `10` | Produces a 17 MHz time-quantum clock. |
+| Nominal time segment 1 | `29` | With SyncSeg=1 and TSEG2=4, total is 34 time quanta. |
+| Nominal time segment 2 | `4` | Sample point is `(1 + 29) / 34 = 88.2%`. |
+| Nominal SJW | `4` | Within TSEG2 and tolerant of oscillator/edge error. |
+| Result | 500000 bit/s | `170 MHz / (10 * 34) = 500 kbit/s`. |
+| Standard filters | At least `1` | `fw_update_service` installs exact command-ID filter at index 0. |
+| RX FIFO0 / TX FIFO | At least one 8-byte element each | All current protocol frames are Classic CAN DLC 8 or smaller. |
+
+The running application's current FDCAN service only handles the safe request
+to enter the bootloader. It rejects other incoming identifiers until the full
+operational command/telemetry transport is added. Do not treat this interim
+filter configuration as completed vehicle CAN control.
