@@ -32,7 +32,7 @@ static const ugv_config_t s_config = {
                                               * the datasheets -- the 22-pole magnetic ring
                                               * yields 88 counts per motor rev in TI12
                                               * mode, twice the nominal "11 PPR" figure */
-    .command_timeout_ms           = 300u,
+    .command_timeout_ms           = UGV_CAN_COMMAND_TIMEOUT_MS,
     .stall_min_duration_ms        = 500u,
     .stall_current_threshold_a    = 50.0f, /* temporarily raised well above the observed
                                              * ADC noise floor (~0-5A-equivalent) on the

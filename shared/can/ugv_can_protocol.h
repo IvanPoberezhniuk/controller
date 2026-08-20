@@ -4,66 +4,121 @@
 #include <stdint.h>
 
 /*
- * Single authoritative definition of the UGV CAN protocol, per
- * Data-only: no FDCAN/TWAI peripheral
- * calls here. FDCAN1 is not configured on the STM32 yet (added in the
- * "add CAN" roadmap milestone) -- this header exists now so firmware,
- * Raspberry Pi service, and PC tooling can share one definition from day one.
- * calls here. Multi-byte wire values are little-endian and must be serialized
- * with ugv_can_codec rather than by copying C structs into a CAN frame. */
+ * Platform-neutral Classic CAN wire contract. Multi-byte values are
+ * little-endian and must be serialized with ugv_can_codec; never memcpy a C
+ * struct into a frame. Tests/can/test_dbc_sync.ps1 verifies that ugv.dbc has
+ * the same message IDs and DLCs as UGV_CAN_MESSAGE_TABLE.
+ */
 
 #define UGV_CAN_PROTOCOL_VERSION_MAJOR 1u
-#define UGV_CAN_PROTOCOL_VERSION_MINOR 0u
+#define UGV_CAN_PROTOCOL_VERSION_MINOR 1u
+
+#define UGV_CAN_BITRATE_BPS             500000u
+#define UGV_CAN_COMMAND_PERIOD_MS_MIN   10u
+#define UGV_CAN_COMMAND_PERIOD_MS_MAX   20u
+#define UGV_CAN_COMMAND_TIMEOUT_MS      300u
 
 typedef enum {
-    UGV_CAN_NODE_LEFT           = 0x10,
-    UGV_CAN_NODE_RIGHT          = 0x11,
-    UGV_CAN_NODE_PI_GATEWAY     = 0x20,
-    UGV_CAN_NODE_BMS_GATEWAY    = 0x30, /* future */
-    UGV_CAN_NODE_ESP32_AUX      = 0x40,
+    UGV_CAN_NODE_LEFT        = 0x10,
+    UGV_CAN_NODE_RIGHT       = 0x11,
+    UGV_CAN_NODE_PI_GATEWAY  = 0x20,
+    UGV_CAN_NODE_BMS_GATEWAY = 0x30, /* reserved */
+    UGV_CAN_NODE_ESP32_AUX   = 0x40,
 } ugv_can_node_id_t;
 
+/* symbol, DBC message name, standard 11-bit CAN ID, DLC */
+#define UGV_CAN_MESSAGE_TABLE(X) \
+    X(VEHICLE_MOTION,  VehicleMotion,  0x100, 8u) \
+    X(SYSTEM_ENABLE,   SystemEnable,   0x110, 2u) \
+    X(AUX_LIGHTING,    AuxLighting,    0x120, 4u) \
+    X(TELEMETRY_LEFT,  TelemetryLeft,  0x180, 8u) \
+    X(TELEMETRY_RIGHT, TelemetryRight, 0x181, 8u) \
+    X(FAULT_LEFT,      FaultLeft,      0x190, 8u) \
+    X(FAULT_RIGHT,     FaultRight,     0x191, 8u) \
+    X(TEMPS_LEFT,      TempsLeft,      0x1A0, 8u) \
+    X(TEMPS_RIGHT,     TempsRight,     0x1A1, 8u) \
+    X(HEARTBEAT_LEFT,  HeartbeatLeft,  0x710, 8u) \
+    X(HEARTBEAT_RIGHT, HeartbeatRight, 0x711, 8u) \
+    X(HEARTBEAT_PI,    HeartbeatPi,    0x720, 8u) \
+    X(HEARTBEAT_ESP32, HeartbeatEsp32, 0x740, 8u)
+
 typedef enum {
-    UGV_CAN_MSG_VEHICLE_MOTION  = 0x100,
-    UGV_CAN_MSG_WHEEL_TARGETS   = 0x101,
-    UGV_CAN_MSG_SYSTEM_ENABLE   = 0x110,
-    UGV_CAN_MSG_AUX_LIGHTING    = 0x120,
-    UGV_CAN_MSG_TELEMETRY_LEFT  = 0x180,
-    UGV_CAN_MSG_TELEMETRY_RIGHT = 0x181,
-    UGV_CAN_MSG_FAULT_LEFT      = 0x190,
-    UGV_CAN_MSG_FAULT_RIGHT     = 0x191,
-    UGV_CAN_MSG_TEMPS_LEFT      = 0x1A0,
-    UGV_CAN_MSG_TEMPS_RIGHT     = 0x1A1,
-    UGV_CAN_MSG_HEARTBEAT_BASE  = 0x700, /* + node ID */
+#define UGV_CAN_DECLARE_ID(symbol, dbc_name, id, dlc) UGV_CAN_MSG_##symbol = id,
+    UGV_CAN_MESSAGE_TABLE(UGV_CAN_DECLARE_ID)
+#undef UGV_CAN_DECLARE_ID
 } ugv_can_message_id_t;
 
-/* 0x100 -- vehicle motion command, Raspberry Pi -> motor node, 8 bytes */
+enum {
+#define UGV_CAN_DECLARE_DLC(symbol, dbc_name, id, dlc) UGV_CAN_##symbol##_DLC = dlc,
+    UGV_CAN_MESSAGE_TABLE(UGV_CAN_DECLARE_DLC)
+#undef UGV_CAN_DECLARE_DLC
+};
+
+/* 0x100, Raspberry Pi -> both motor nodes. Targets are signed RPM. */
 typedef struct {
-    uint8_t  sequence;
-    uint8_t  mode_flags;
-    int16_t  left_target;   /* signed, units TBD (raw PWM or RPM*scale) */
-    int16_t  right_target;
-    uint8_t  limit;         /* speed/torque limit */
-    uint8_t  reserved;
+    uint8_t sequence;
+    uint8_t mode_flags;
+    int16_t left_target_rpm;
+    int16_t right_target_rpm;
+    uint8_t limit_pct;
+    uint8_t reserved;
 } ugv_can_motion_cmd_t;
 
-/* 0x110 -- system enable / emergency stop, 1+ bytes */
+/* 0x110, Raspberry Pi -> all control nodes. */
 typedef struct {
     uint8_t enabled;
     uint8_t emergency_stop;
 } ugv_can_system_enable_t;
 
-#define UGV_CAN_MOTION_CMD_DLC   8u
-#define UGV_CAN_SYSTEM_ENABLE_DLC 2u
+/* 0x120, Raspberry Pi -> ESP32 AUX. Intensities are 0..100 percent. */
+typedef struct {
+    uint8_t front_pct;
+    uint8_t rear_pct;
+    uint8_t left_indicator;
+    uint8_t right_indicator;
+} ugv_can_aux_lighting_t;
 
-/* Heartbeat and command-timeout thresholds, per ugv-can-protocol SKILL.md.
- * The STM32 must not continue using the last speed command indefinitely. */
-#define UGV_CAN_COMMAND_PERIOD_MS_MIN     10u   /* 100 Hz */
-#define UGV_CAN_COMMAND_PERIOD_MS_MAX     20u   /* 50 Hz */
-#define UGV_CAN_COMMAND_WARN_MS           150u
-#define UGV_CAN_COMMAND_CONTROLLED_STOP_MS 250u
-#define UGV_CAN_COMMAND_DRIVER_DISABLE_MS 500u
+/* 0x180/0x181, motor node -> Raspberry Pi/ESP32. */
+typedef struct {
+    uint8_t sequence;
+    uint8_t safety_state;
+    int16_t front_rpm;
+    int16_t center_rpm;
+    int16_t rear_rpm;
+} ugv_can_motor_telemetry_t;
 
-#define UGV_CAN_BITRATE_BPS 500000u
+typedef enum {
+    UGV_CAN_MOTOR_FAULT_STALLED         = 1u << 0,
+    UGV_CAN_MOTOR_FAULT_OVERCURRENT     = 1u << 1,
+    UGV_CAN_MOTOR_FAULT_OVERTEMPERATURE = 1u << 2,
+    UGV_CAN_MOTOR_FAULT_DRIVER          = 1u << 3,
+    UGV_CAN_MOTOR_FAULT_ENCODER         = 1u << 4,
+} ugv_can_motor_fault_flag_t;
+
+/* 0x190/0x191, one 16-bit fault mask per local motor. */
+typedef struct {
+    uint8_t sequence;
+    uint8_t safety_state;
+    uint16_t front_faults;
+    uint16_t center_faults;
+    uint16_t rear_faults;
+} ugv_can_fault_report_t;
+
+/* 0x1A0/0x1A1. Temperatures use signed centi-degrees Celsius. */
+typedef struct {
+    uint8_t sequence;
+    uint8_t valid_mask; /* bits 0..2: front, center, rear */
+    int16_t front_centi_c;
+    int16_t center_centi_c;
+    int16_t rear_centi_c;
+} ugv_can_temperatures_t;
+
+typedef struct {
+    uint8_t protocol_major;
+    uint8_t protocol_minor;
+    uint8_t safety_state;
+    uint8_t status_flags;
+    uint32_t uptime_ms;
+} ugv_can_heartbeat_t;
 
 #endif /* UGV_CAN_PROTOCOL_H */
