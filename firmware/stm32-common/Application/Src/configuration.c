@@ -22,6 +22,7 @@ static const ugv_config_t s_config = {
     .pwm_min_effective            = 0.10f,
     .max_pwm                      = 1.0f, /* full authority -- motor0 speed loop
                                              * validated on the bench at 10/100/250 RPM */
+    .max_target_rpm               = 333.0f,
     .accel_limit_rpm_per_s        = 100.0f, /* bench-conservative: 0->60 RPM in ~0.6s */
     .decel_limit_rpm_per_s        = 200.0f,
     .direction_change_coast_ms    = 100u,

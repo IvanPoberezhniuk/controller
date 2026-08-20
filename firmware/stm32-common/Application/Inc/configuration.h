@@ -23,6 +23,7 @@ typedef struct {
     float    pwm_dead_zone;        /* 0..1 fraction of max PWM */
     float    pwm_min_effective;    /* 0..1, calibrated minimum to overcome static friction */
     float    max_pwm;              /* 0..1 fraction of TIM ARR */
+    float    max_target_rpm;       /* absolute accepted wheel-speed command */
     float    accel_limit_rpm_per_s; /* ramps target_rpm, per ugv-stm32-firmware
                                       * SKILL.md's "acceleration limiter -> per-wheel
                                       * target RPM" command-path stage -- RPM units,

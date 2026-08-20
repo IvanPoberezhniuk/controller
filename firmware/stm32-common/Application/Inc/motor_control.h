@@ -35,11 +35,9 @@ typedef struct {
 
 void motor_control_init(void);
 
-/* Command path per ugv-stm32-firmware SKILL.md: validate -> mode/timeout ->
- * accel limiter -> per-wheel target -> PID -> PWM limiter -> driver output.
- * `target_rpm` has already passed timeout/mode validation by the caller
- * (safety.c); this sets the ramp-limited target for the next control tick. */
-void motor_control_set_target(motor_index_t motor, float target_rpm);
+/* Accepts only a finite target within config.max_target_rpm. Returns false
+ * without changing the command when the motor index or target is invalid. */
+bool motor_control_set_target(motor_index_t motor, float target_rpm);
 
 /* Runs one control-loop iteration for every motor: ramp, PID, direction
  * interlock, PWM output. Must be called at a fixed rate from the TIM6-paced

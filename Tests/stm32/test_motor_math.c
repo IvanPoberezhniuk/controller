@@ -1,9 +1,9 @@
-/* Host-buildable, HAL-independent test for the pure math in
- * firmware/stm32-common/Application/Src/motor_math.c. Not part of the ARM CMake build --
+/* Host-buildable, HAL-independent test for the pure motor math. Not part of
+ * the ARM CMake build --
  * compile and run directly on the host:
  *
  *   gcc -std=c11 -Wall -Wextra -Ifirmware/stm32-common/Application/Inc \
- *       Tests/stm32/test_motor_control.c \
+ *       Tests/stm32/test_motor_math.c \
  *       firmware/stm32-common/Application/Src/motor_math.c -lm \
  *       -o test_motor_control && ./test_motor_control
  */
@@ -23,7 +23,7 @@ static void test_ramp_toward(void)
     assert(float_eq(mm_ramp_toward(0.0f, 10.0f, 1.0f), 1.0f));
     assert(float_eq(mm_ramp_toward(0.0f, 10.0f, 100.0f), 10.0f));
     assert(float_eq(mm_ramp_toward(5.0f, 0.0f, 1.0f), 4.0f));
-    assert(float_eq(mm_ramp_toward(5.0f, 0.0f, 0.0f), 0.0f));
+    assert(float_eq(mm_ramp_toward(5.0f, 0.0f, 0.0f), 5.0f));
 }
 
 static void test_pid_step(void)
@@ -60,12 +60,23 @@ static void test_sign(void)
     assert(mm_sign(0.0f) == 0);
 }
 
+static void test_target_validation(void)
+{
+    assert(mm_target_is_valid(0.0f, 333.0f));
+    assert(mm_target_is_valid(-333.0f, 333.0f));
+    assert(!mm_target_is_valid(333.1f, 333.0f));
+    assert(!mm_target_is_valid(NAN, 333.0f));
+    assert(!mm_target_is_valid(INFINITY, 333.0f));
+    assert(!mm_target_is_valid(10.0f, -1.0f));
+}
+
 int main(void)
 {
     test_ramp_toward();
     test_pid_step();
     test_encoder_delta();
     test_sign();
+    test_target_validation();
     printf("all motor_math tests passed\n");
     return 0;
 }

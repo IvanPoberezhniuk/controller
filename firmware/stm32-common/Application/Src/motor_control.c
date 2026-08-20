@@ -96,9 +96,14 @@ void motor_control_init(void)
     }
 }
 
-void motor_control_set_target(motor_index_t motor, float target_rpm)
+bool motor_control_set_target(motor_index_t motor, float target_rpm)
 {
+    if ((unsigned)motor >= UGV_MOTOR_COUNT ||
+        !mm_target_is_valid(target_rpm, config_get()->max_target_rpm)) {
+        return false;
+    }
     s_internal[motor].commanded_rpm = target_rpm;
+    return true;
 }
 
 void motor_control_set_enabled(motor_index_t motor, bool enabled)
@@ -142,7 +147,7 @@ static void step_one(motor_index_t motor, float dt_s)
 
     uint32_t now = HAL_GetTick();
     if (in->coast_until_ms != 0u) {
-        if (now < in->coast_until_ms) {
+        if ((int32_t)(now - in->coast_until_ms) < 0) {
             st->target_rpm = 0.0f;
             st->pwm_command = 0.0f;
             hw_write_pwm(motor, 0.0f);

@@ -34,9 +34,11 @@ static void process_command(const char *line)
     } else {
         int motor = -1;
         float rpm = 0.0f;
-        if (sscanf(line, "m%d %f", &motor, &rpm) == 2 &&
-            motor >= 0 && motor < (int)UGV_MOTOR_COUNT) {
-            motor_control_set_target((motor_index_t)motor, rpm);
+        int consumed = 0;
+        if (sscanf(line, "m%d %f %n", &motor, &rpm, &consumed) == 2 &&
+            line[consumed] == '\0' && motor >= 0 &&
+            motor < (int)UGV_MOTOR_COUNT &&
+            motor_control_set_target((motor_index_t)motor, rpm)) {
             safety_notify_command_received();
         }
     }

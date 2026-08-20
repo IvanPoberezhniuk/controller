@@ -1,10 +1,12 @@
 #include "motor_math.h"
 
+#include <math.h>
+
 float mm_ramp_toward(float current, float target, float max_delta)
 {
     float delta = target - current;
     if (max_delta <= 0.0f) {
-        return target;
+        return current;
     }
     if (delta > max_delta) {
         return current + max_delta;
@@ -56,4 +58,11 @@ int mm_sign(float value)
         return -1;
     }
     return 0;
+}
+
+bool mm_target_is_valid(float target_rpm, float max_abs_rpm)
+{
+    return isfinite(target_rpm) && isfinite(max_abs_rpm) &&
+           max_abs_rpm >= 0.0f &&
+           target_rpm >= -max_abs_rpm && target_rpm <= max_abs_rpm;
 }
