@@ -3,7 +3,9 @@
 The two motor nodes use a small, role-specific CAN bootloader. ST-Link is not
 required in normal operation. A blank STM32 must first receive the bootloader
 once through the factory ROM USART2 bootloader; all later application updates
-come from Raspberry Pi over Classic CAN at 500 kbit/s.
+come from a temporary Linux/SocketCAN service host over Classic CAN at
+500 kbit/s. The vehicle Raspberry Pi remains Wi-Fi-only and is not used for
+this maintenance connection.
 
 The STM32G431 system-memory bootloader does not support FDCAN, so a completely
 blank MCU cannot be provisioned directly through CAN. The custom bootloader in
@@ -36,7 +38,7 @@ the final GPIO labels. The outputs are:
 Never interchange Left and Right bootloaders or applications. The node identity
 selects different CAN data/status identifiers and is also stored in the image
 metadata. A normal `stm32-*-release` application is linked at `0x08000000` and
-is not a valid OTA image; the Raspberry Pi updater rejects it.
+is not a valid OTA image; the SocketCAN updater rejects it.
 
 ## One-time provisioning through USB-UART
 
@@ -73,12 +75,12 @@ USART2 is needed only for this first installation or deep recovery. SWD pads
 may remain on the PCB as optional debug/test points, but they are not part of
 the update path.
 
-## Raspberry Pi CAN setup
+## Temporary SocketCAN service connection
 
-Each STM32 connects PA11/PA12 to an external 3.3 V-compatible CAN transceiver;
-Raspberry Pi also needs its own CAN controller/transceiver or CAN HAT. The
-device-tree overlay is adapter-specific and cannot be selected until the exact
-Pi CAN adapter is known. Once Linux exposes `can0`, configure the shared bus:
+Each STM32 and ESP32 uses its permanent SN65HVD230. To service firmware,
+connect an external Linux computer through a USB-CAN adapter that exposes a
+SocketCAN interface. This adapter is temporary and does not make the onboard
+Raspberry Pi a CAN node. Once Linux exposes `can0`, configure it:
 
 ```bash
 sudo ip link set can0 down 2>/dev/null || true
@@ -87,9 +89,10 @@ sudo ip link set can0 up
 ip -details -statistics link show can0
 ```
 
-Copy `tools/ugv_can_update.py` and the required OTA `.bin` to Raspberry Pi, or
-run them from a checkout of this repository. The updater uses Python's standard
-library and Linux SocketCAN; it does not require `python-can`.
+Copy `tools/ugv_can_update.py` and the required OTA `.bin` to that service
+computer, or run them from a checkout of this repository. The updater uses
+Python's standard library and Linux SocketCAN; it does not require
+`python-can`.
 
 For the first application immediately after UART provisioning, the node is
 already in the custom bootloader:
@@ -118,20 +121,20 @@ update a moving or enabled vehicle.
 ## Update transaction and recovery
 
 ```text
-Pi                         running app / bootloader
- |--- ENTER (0x600) ------> disable outputs, reset
- |--- QUERY (0x600) ------> status READY/IDLE (0x680 or 0x681)
- |--- BEGIN(size) --------> invalidate old metadata, erase app pages
- |=== DATA, 6 B/frame ====> ACK every 32 frames
- |--- FINISH(CRC-32) -----> verify vectors + complete flash CRC
- |<-- VERIFIED ----------- commit metadata last
- |--- ACTIVATE -----------> reset and start application
+Service host                running app / bootloader
+     |--- ENTER (0x600) ---> disable outputs, reset
+     |--- QUERY (0x600) ---> status READY/IDLE (0x680 or 0x681)
+     |--- BEGIN(size) -----> invalidate old metadata, erase app pages
+     |=== DATA, 6 B/frame => ACK every 32 frames
+     |--- FINISH(CRC-32) -> verify vectors + complete flash CRC
+     |<-- VERIFIED -------- commit metadata last
+     |--- ACTIVATE -------> reset and start application
 ```
 
 Firmware data uses `0x610` for Left and `0x611` for Right. Status uses `0x680`
 and `0x681`. Frames contain a sequence number; duplicates are acknowledged and
-gaps return the next expected sequence. The Pi queries progress and retries a
-window after a lost ACK.
+gaps return the next expected sequence. The service host queries progress and
+retries a window after a lost ACK.
 
 If power or CAN is lost after `BEGIN`, valid metadata has already been erased.
 The bootloader will not jump into a partial image and will wait on CAN after the
