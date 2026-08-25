@@ -79,7 +79,7 @@ try {
 
     $python = Get-Command python -ErrorAction SilentlyContinue
     if (-not $python) {
-        throw "Python is required to run the Raspberry Pi updater tests."
+        throw "Python is required to run the SocketCAN updater tests."
     }
     & $python.Source "Tests/update/test_can_updater.py"
     if ($LASTEXITCODE -ne 0) {

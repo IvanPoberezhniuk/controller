@@ -23,7 +23,7 @@
 typedef enum {
     UGV_CAN_NODE_LEFT        = 0x10,
     UGV_CAN_NODE_RIGHT       = 0x11,
-    UGV_CAN_NODE_PI_GATEWAY  = 0x20,
+    UGV_CAN_NODE_PI_GATEWAY  = 0x20, /* reserved legacy ID; Pi is Wi-Fi-only */
     UGV_CAN_NODE_BMS_GATEWAY = 0x30, /* reserved */
     UGV_CAN_NODE_ESP32_AUX   = 0x40,
 } ugv_can_node_id_t;
@@ -60,9 +60,9 @@ enum {
 };
 
 /*
- * 0x100 ESP32 -> both motor nodes (final command), and
- * 0x101 Raspberry Pi -> ESP32 (AUTO request).
- * Both use the same signed-RPM payload. Only the ESP32 may produce 0x100.
+ * 0x100 ESP32 -> both motor nodes (final command). 0x101 retains the same
+ * signed-RPM payload for wire compatibility but is reserved: future Pi AUTO
+ * requests reach ESP32 over Wi-Fi/IP. Only the ESP32 may produce 0x100.
  */
 typedef struct {
     uint8_t sequence;
@@ -74,16 +74,17 @@ typedef struct {
 } ugv_can_motion_cmd_t;
 
 /*
- * 0x110 ESP32 -> motor nodes (final state), and
- * 0x111 Raspberry Pi -> ESP32 (AUTO request).
- * Both use the same payload. Only the ESP32 may produce 0x110.
+ * 0x110 ESP32 -> motor nodes (final state). 0x111 retains the same payload
+ * for wire compatibility but is reserved in the Wi-Fi-only Pi architecture.
+ * Only the ESP32 may produce 0x110.
  */
 typedef struct {
     uint8_t enabled;
     uint8_t emergency_stop;
 } ugv_can_system_enable_t;
 
-/* 0x120, Raspberry Pi -> ESP32 AUX. Intensities are 0..100 percent. */
+/* Reserved legacy 0x120 payload. ESP32 now owns local lighting directly.
+ * Intensities are 0..100 percent. */
 typedef struct {
     uint8_t front_pct;
     uint8_t rear_pct;
@@ -103,7 +104,8 @@ typedef enum {
     UGV_CAN_CONTROL_SOURCE_PI   = 2,
 } ugv_can_control_source_t;
 
-/* 0x130, ESP32 -> Raspberry Pi. CRSF link and command-arbiter status. */
+/* 0x130, ESP32 status for optional CAN service diagnostics. Pi receives
+ * selected status through the future Wi-Fi telemetry relay. */
 typedef struct {
     uint8_t sequence;
     uint8_t selected_mode;
@@ -115,7 +117,7 @@ typedef struct {
     int8_t rssi_dbm;
 } ugv_can_control_status_t;
 
-/* 0x180/0x181, motor node -> Raspberry Pi/ESP32. */
+/* 0x180/0x181, motor node -> ESP32 and optional CAN service monitor. */
 typedef struct {
     uint8_t sequence;
     uint8_t safety_state;

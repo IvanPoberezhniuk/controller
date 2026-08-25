@@ -256,7 +256,7 @@ class Updater:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Update one UGV STM32 node through Raspberry Pi SocketCAN"
+        description="Update one UGV STM32 node from a Linux SocketCAN service host"
     )
     parser.add_argument("--interface", default="can0", help="SocketCAN interface")
     parser.add_argument("--node", choices=("left", "right"), required=True)

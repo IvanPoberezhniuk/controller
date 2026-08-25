@@ -7,16 +7,18 @@
 
 #include "ugv_can_protocol.h"
 
-/* Firmware-update traffic uses Classic CAN 2.0 frames so the Raspberry Pi,
- * STM32 FDCAN peripherals and ESP32 TWAI controller can share one bus. */
+/* Firmware-update traffic uses Classic CAN 2.0 frames so a temporary
+ * SocketCAN service host, STM32 FDCAN peripherals, and ESP32 TWAI can share
+ * one bus during maintenance. */
 #define UGV_FW_PROTOCOL_VERSION       1u
 #define UGV_FW_FRAME_DLC              8u
 #define UGV_FW_DATA_BYTES_PER_FRAME   6u
 #define UGV_FW_ACK_INTERVAL_FRAMES    32u
 #define UGV_FW_BROADCAST_NODE         0xffu
 
-/* Pi -> STM32 command; node-specific data streams avoid spending one of the
- * eight Classic-CAN bytes on a target field. Status IDs identify the sender. */
+/* Service host -> STM32 command; node-specific data streams avoid spending
+ * one of the eight Classic-CAN bytes on a target field. Status IDs identify
+ * the sender. */
 #define UGV_FW_CAN_ID_COMMAND       0x600u
 #define UGV_FW_CAN_ID_DATA_LEFT     0x610u
 #define UGV_FW_CAN_ID_DATA_RIGHT    0x611u
