@@ -63,7 +63,8 @@ driver temperatures, battery sag, CAN error rate. **Deliverable:** final
 fuse, cable, driver, cooling, and software-limit values.
 
 ### Phase 10: auxiliary systems
-Lights, fan control, GPS, IMU, additional telemetry, ELRS, future autonomy.
+Lights, fan control, HGLRC M100-5883 GPS/compass, QMI8658A IMU, additional
+telemetry, ELRS, future autonomy.
 
 ## Test methodology
 

@@ -14,7 +14,7 @@
             ESP32-S3 control/AUX node <------ Wi-Fi/IP ------ Raspberry Pi 5
             - MANUAL/AUTO arbiter                            - IMX708 camera/audio
             - final motion authority                         - video streaming
-            - OLED, IMU, GPS, light sensor                   - future navigation
+            - OLED, QMI8658A, M100-5883                     - future navigation
             - lights and warning buzzer                      - logging/network
                      |
           final Classic CAN commands, 500 kbit/s
@@ -110,8 +110,9 @@ software execution.
   temperature sampling, final-command timeout, target reset, and driver
   disable.
 - ESP32 owns XR4/CRSF input, MANUAL/AUTO arbitration, final vehicle commands,
-  the local display/control panel, IMU, light sensor, GPS, lighting outputs,
-  warning buzzer, and the future Wi-Fi command/telemetry gateway.
+  the local display/control panel, QMI8658A IMU, M100-5883 GPS/compass,
+  future light sensor, lighting outputs, warning buzzer, and the future Wi-Fi
+  command/telemetry gateway.
 - Raspberry Pi owns the IMX708 camera, full speaker/audio path, navigation,
   video streaming, future Wi-Fi autonomy requests, telemetry storage, and
   logging. It never publishes or receives CAN frames directly.

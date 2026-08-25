@@ -70,6 +70,12 @@ Camera:
 IMX708 -> Raspberry Pi -> H.264 -> MediaMTX ->
 rtsp://roverpi.local:8554/ugv -> Qt control station
 
+ESP32 navigation/orientation sensors:
+- HGLRC M100-5883 M10-class GPS with integrated compass: GPS UART at
+  115200 baud/10 Hz plus compass I2C;
+- QMI8658A six-axis accelerometer/gyroscope over I2C;
+- ambient-light sensor remains unresolved.
+
 Firmware repository:
 - one shared STM32 motor-node implementation;
 - separate left/right target configurations and build images;
