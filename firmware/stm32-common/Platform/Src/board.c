@@ -21,20 +21,6 @@ void board_init(void)
     }
 
     __HAL_RCC_CLEAR_RESET_FLAGS();
-
-    /* Enable the DWT cycle counter for board_delay_us(). */
-    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-    DWT->CYCCNT = 0;
-    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
-}
-
-void board_delay_us(uint32_t us)
-{
-    uint32_t cycles = us * (SystemCoreClock / 1000000u);
-    uint32_t start = DWT->CYCCNT;
-    while ((DWT->CYCCNT - start) < cycles) {
-        /* busy-wait */
-    }
 }
 
 board_reset_reason_t board_get_reset_reason(void)

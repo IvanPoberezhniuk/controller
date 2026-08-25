@@ -8,20 +8,16 @@ typedef struct {
     TIM_HandleTypeDef *lpwm_timer;
     uint32_t rpwm_channel;
     uint32_t lpwm_channel;
-    GPIO_TypeDef *r_en_port;
-    uint16_t r_en_pin;
-    GPIO_TypeDef *l_en_port;
-    uint16_t l_en_pin;
+    GPIO_TypeDef *enable_port;
+    uint16_t enable_pin;
 } motor_hw_t;
 
-/* PA10 (macro'd MOTOR2_R_EN_Pin in main.h) is really TIM1_CH3 now -- see
- * board.h. MOTOR2_R_EN_REAL_* is the actual PB10 R_EN output. */
 static const motor_hw_t s_hw[UGV_MOTOR_COUNT] = {
     [MOTOR_FRONT] = {
         .rpwm_timer = &htim1, .lpwm_timer = &htim1,
         .rpwm_channel = TIM_CHANNEL_1, .lpwm_channel = TIM_CHANNEL_2,
-        .r_en_port = MOTOR0_R_EN_GPIO_Port, .r_en_pin = MOTOR0_R_EN_Pin,
-        .l_en_port = MOTOR0_L_EN_GPIO_Port, .l_en_pin = MOTOR0_L_EN_Pin,
+        .enable_port = MOTOR0_COMMON_EN_GPIO_Port,
+        .enable_pin = MOTOR0_COMMON_EN_Pin,
     },
     [MOTOR_CENTER] = {
         .rpwm_timer = &htim1,
@@ -33,14 +29,14 @@ static const motor_hw_t s_hw[UGV_MOTOR_COUNT] = {
         .lpwm_channel = TIM_CHANNEL_4,
 #endif
         .rpwm_channel = TIM_CHANNEL_3,
-        .r_en_port = MOTOR1_R_EN_GPIO_Port, .r_en_pin = MOTOR1_R_EN_Pin,
-        .l_en_port = MOTOR1_L_EN_GPIO_Port, .l_en_pin = MOTOR1_L_EN_Pin,
+        .enable_port = MOTOR1_COMMON_EN_GPIO_Port,
+        .enable_pin = MOTOR1_COMMON_EN_Pin,
     },
     [MOTOR_REAR] = {
         .rpwm_timer = &htim15, .lpwm_timer = &htim15,
         .rpwm_channel = TIM_CHANNEL_1, .lpwm_channel = TIM_CHANNEL_2,
-        .r_en_port = MOTOR2_R_EN_REAL_GPIO_Port, .r_en_pin = MOTOR2_R_EN_REAL_Pin,
-        .l_en_port = MOTOR2_L_EN_GPIO_Port, .l_en_pin = MOTOR2_L_EN_Pin,
+        .enable_port = MOTOR2_COMMON_EN_GPIO_Port,
+        .enable_pin = MOTOR2_COMMON_EN_Pin,
     },
 };
 
@@ -88,8 +84,7 @@ static void hw_set_driver_enable(motor_index_t motor, bool enabled)
     const motor_hw_t *hw = &s_hw[motor];
     GPIO_PinState pin_state = enabled ? GPIO_PIN_SET : GPIO_PIN_RESET;
 
-    HAL_GPIO_WritePin(hw->r_en_port, hw->r_en_pin, pin_state);
-    HAL_GPIO_WritePin(hw->l_en_port, hw->l_en_pin, pin_state);
+    HAL_GPIO_WritePin(hw->enable_port, hw->enable_pin, pin_state);
 }
 
 void motor_control_init(void)

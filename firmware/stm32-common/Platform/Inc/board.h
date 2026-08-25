@@ -21,13 +21,16 @@ extern ADC_HandleTypeDef  hadc1;
 extern ADC_HandleTypeDef  hadc2;
 extern IWDG_HandleTypeDef hiwdg;
 
-/* PA10 still carries the macro name MOTOR2_R_EN_Pin in main.h -- a leftover
- * from before that pin was reassigned to TIM1_CH3 (motor1 RPWM). The real
- * motor2 R_EN output is PB10, which never got a CubeMX User Label, so it has
- * no generated macro at all. Use these two defines everywhere instead of the
- * misleading MOTOR2_R_EN_Pin/MOTOR2_R_EN_GPIO_Port from main.h. */
-#define MOTOR2_R_EN_REAL_GPIO_Port GPIOB
-#define MOTOR2_R_EN_REAL_Pin       GPIO_PIN_10
+/* Each dual-half-bridge driver uses one common enable net: its R_EN and L_EN
+ * inputs are wired together and driven from this GPIO. Explicit definitions
+ * keep application and bootloader pin ownership independent of stale CubeMX
+ * labels until the user regenerates the final .ioc manually. */
+#define MOTOR0_COMMON_EN_GPIO_Port GPIOB
+#define MOTOR0_COMMON_EN_Pin       GPIO_PIN_0
+#define MOTOR1_COMMON_EN_GPIO_Port GPIOB
+#define MOTOR1_COMMON_EN_Pin       GPIO_PIN_9
+#define MOTOR2_COMMON_EN_GPIO_Port GPIOB
+#define MOTOR2_COMMON_EN_Pin       GPIO_PIN_10
 
 /* Reset reason, decoded once at boot before HAL clears the RCC reset flags so
  * telemetry can report why the node restarted. */
@@ -44,10 +47,5 @@ typedef enum {
 void board_init(void);
 board_reset_reason_t board_get_reset_reason(void);
 const char *board_reset_reason_name(board_reset_reason_t reason);
-
-/* Busy-wait microsecond delay via the DWT cycle counter -- HAL_Delay()'s
- * SysTick is only 1 ms granularity, too coarse for things like a CD74HC4067
- * mux channel-select settle time. board_init() enables the counter. */
-void board_delay_us(uint32_t us);
 
 #endif /* PLATFORM_BOARD_H */
