@@ -220,7 +220,7 @@ disabled independently without cutting power to the other two.
 |---|---|---|
 | Pins | PA11 RX, PA12 TX | Keeps CAN away from PB8/BOOT0 and matches the custom bootloader. |
 | Kernel clock | PCLK1, 170 MHz | Already available with the current undivided clock tree. |
-| Frame format / mode | Classic CAN / Normal | Compatible with Raspberry Pi CAN and ESP32 TWAI on the shared bus. |
+| Frame format / mode | Classic CAN / Normal | Compatible with ESP32 TWAI and a temporary SocketCAN service adapter. Raspberry Pi is not on the bus. |
 | Auto retransmission | Enabled | Hardware retries arbitration/errors; higher-level OTA sequence ACK still handles lost windows. |
 | Nominal prescaler | `10` | Produces a 17 MHz time-quantum clock. |
 | Nominal time segment 1 | `29` | With SyncSeg=1 and TSEG2=4, total is 34 time quanta. |
