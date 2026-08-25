@@ -13,18 +13,14 @@ extern TIM_HandleTypeDef  htim3;
 extern TIM_HandleTypeDef  htim4;
 extern TIM_HandleTypeDef  htim6;
 extern TIM_HandleTypeDef  htim15;
-#if UGV_FINAL_OTA_PINOUT_CONFIGURED
 extern TIM_HandleTypeDef  htim16;
-#endif
 extern UART_HandleTypeDef huart2;
 extern ADC_HandleTypeDef  hadc1;
 extern ADC_HandleTypeDef  hadc2;
 extern IWDG_HandleTypeDef hiwdg;
 
 /* Each dual-half-bridge driver uses one common enable net: its R_EN and L_EN
- * inputs are wired together and driven from this GPIO. Explicit definitions
- * keep application and bootloader pin ownership independent of stale CubeMX
- * labels until the user regenerates the final .ioc manually. */
+ * inputs are wired together and driven from this GPIO. */
 #define MOTOR0_COMMON_EN_GPIO_Port GPIOB
 #define MOTOR0_COMMON_EN_Pin       GPIO_PIN_0
 #define MOTOR1_COMMON_EN_GPIO_Port GPIOB

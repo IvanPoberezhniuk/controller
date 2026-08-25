@@ -1,11 +1,6 @@
-param(
-    [switch]$FinalPinout
-)
-
 . (Join-Path $PSScriptRoot "stm32-env.ps1")
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-$pinoutValue = if ($FinalPinout) { "ON" } else { "OFF" }
 
 Push-Location $repoRoot
 try {
@@ -17,7 +12,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Build failed: $bootPreset" }
 
         $appPreset = "stm32-$role-ota-release"
-        cmake --preset $appPreset "-DUGV_FINAL_OTA_PINOUT=$pinoutValue"
+        cmake --preset $appPreset
         if ($LASTEXITCODE -ne 0) { throw "Configure failed: $appPreset" }
         cmake --build --preset $appPreset
         if ($LASTEXITCODE -ne 0) { throw "Build failed: $appPreset" }
