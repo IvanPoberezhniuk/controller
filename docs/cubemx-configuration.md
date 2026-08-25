@@ -1,15 +1,16 @@
 # CubeMX Configuration Reference — STM32G431CBT6 UGV Motor Node
 
-This is the manual CubeMX checklist for the shared STM32G431CBT6 motor-node
+This is the verified CubeMX reference for the shared STM32G431CBT6 motor-node
 project. Left and Right use the same `.ioc`; role-specific behavior is selected
-by the CMake preset. The checked-in `.ioc` already contains the six direct-ADC
-inputs but still has the pre-CAN PWM/enable labels. It remains intentionally
-unchanged so the user can perform and review the final CubeMX regeneration.
+by the CMake preset. The checked-in `.ioc` and generated `Core/` code already
+contain the final CAN, PWM, common-enable, and six-input direct-ADC layout.
 
-## Required final pin migration
+## Applied final pin configuration
 
-Make these changes together in `firmware/stm32-common/UGV_MotorNode.ioc`. A
-partial migration creates pin conflicts or drives the center motor incorrectly.
+The following settings are already applied in
+`firmware/stm32-common/UGV_MotorNode.ioc`. Preserve them together during future
+edits; a partial rollback creates pin conflicts or drives the center motor
+incorrectly.
 
 1. In TIM1 disable PWM Generation CH4 on PA11. Keep CH1/CH2/CH3 on
    PA8/PA9/PA10.
@@ -30,15 +31,15 @@ partial migration creates pin conflicts or drives the center motor incorrectly.
    both ADCs: `170 MHz / 8 = 21.25 MHz` ADC clock.
 6. Enable FDCAN1 in Classic CAN normal mode on PA11=`FDCAN1_RX` and
    PA12=`FDCAN1_TX`, using the exact timing in the FDCAN section below.
-7. Set the standard-filter count to at least `1`, RX FIFO0 to at least one
-   8-byte element, and TX FIFO/queue to at least one 8-byte element. The
-   temporary application update service uses standard filter index 0.
+7. Set the standard-filter count to `1` and TX mode to FIFO operation. The G4
+   HAL exposes a fixed message-RAM layout rather than CubeMX element-count
+   fields; the application update service uses standard filter index 0 and RX
+   FIFO0.
 8. Generate code with **Keep User Code when re-generating** enabled. Confirm
    `MX_TIM16_Init()` and `MX_FDCAN1_Init()` are called before
    `app_main_init()`.
 9. Build both OTA applications and bootloaders with
-   `tools/build-update-images.ps1 -FinalPinout`. No current-sensing feature
-   flag is required.
+   `tools/build-update-images.ps1`. The final pinout is unconditional.
 10. After the R_IS/L_IS conditioning is installed and calibrated, replace the
     placeholder `current_sense_scale_a_per_v` and current thresholds, then set
     `UGV_CURRENT_SENSE_CALIBRATED` to `1`. Do not set it merely because ADC
@@ -91,7 +92,7 @@ tick was silently running ~10.6x too fast until caught and fixed.
 |---|---|---|
 | Channel 1 | PWM Generation CH1 on PB8 | Replaces TIM1_CH4/PA11 and frees PA11 for FDCAN RX. PB8 also serves as BOOT0 during one-time provisioning. |
 | Clock source | Internal clock | Uses the same 170 MHz timer clock as TIM1. |
-| Prescaler / Period / Pulse | `0` / `8499` / `0` | 20 kHz, initially zero duty. Application code uses `htim16` only when `UGV_FINAL_OTA_PINOUT_CONFIGURED=1`. |
+| Prescaler / Period / Pulse | `0` / `8499` / `0` | 20 kHz, initially zero duty. Application code always uses `htim16` for center LPWM. |
 
 ## TIM15 — motor2 PWM
 
@@ -133,7 +134,7 @@ general-purpose timers convenient for this on one chip.
 
 USART2 remains the bench console and is also the supported one-time path into
 the STM32 factory ROM bootloader. Application commands and OTA updates use
-FDCAN after the final migration. The application console is 8N1; the ROM
+FDCAN. The application console is 8N1; the ROM
 bootloader protocol uses even parity, which STM32CubeProgrammer selects for the
 factory-provisioning session.
 
@@ -157,7 +158,7 @@ This five-rank scan is the final architecture and is already represented in
 | Scan Conversion Mode | Enabled | Required to sample more than one channel per ADC — steps through all enabled channels in Rank order each time a conversion is triggered. |
 | Number Of Conversion | 5 | Must match the channel count exactly, or the scan sequence doesn't cover everything. |
 | Rank → Channel mapping | Rank1=CH3, Rank2=CH4, Rank3=CH12, Rank4=CH13, Rank5=CH17 | Each Rank needs its own explicit Channel assignment — CubeMX's generated code silently reused the *first* channel for every rank when this wasn't set per-rank, another real mistake caught by reading the generated `main.c` rather than trusting the GUI. |
-| Sampling time | 92.5 cycles initially | Provides acquisition margin for the final R_IS/L_IS conditioning network; reduce only after bench validation. The checked-in `.ioc` still has the earlier 2.5-cycle value, so update this manually before regeneration. |
+| Sampling time | 92.5 cycles initially | Provides acquisition margin for the final R_IS/L_IS conditioning network; reduce only after bench validation. This value is checked into the `.ioc` and generated initialization. |
 
 Firmware side (`firmware/stm32-common/Application/Src/current_monitor.c`): both ADCs are
 calibrated once at startup via `HAL_ADCEx_Calibration_Start()` before any
@@ -167,11 +168,12 @@ per rank) rather than DMA — simple and sufficient at this sample rate,
 though a DMA circular buffer would be the natural upgrade if the control
 loop rate increases later.
 
-**Clock note:** the current generated `main.c` selects SYSCLK for ADC12 and
-uses `ADC_CLOCK_ASYNC_DIV8`, producing `170/8 = 21.25 MHz`. Ensure CubeMX
-contains the same selection before regeneration; otherwise it can restore the
-older synchronous divide-by-4 setting. Validate ADC timing and the final
-R_IS/L_IS scale against the assembled conditioning network.
+**Clock note:** the `.ioc` selects SYSCLK for ADC12 and both ADCs use
+`ADC_CLOCK_ASYNC_DIV8`, producing `170/8 = 21.25 MHz`. CubeMX 6.18 records the
+kernel selection but does not emit the G431 RCC call, so the preserved
+`USER CODE BEGIN SysInit` block in `Core/Src/main.c` applies it before ADC
+initialization. Validate ADC timing and the final R_IS/L_IS scale against the
+assembled conditioning network.
 
 ## Direct current sensing: ADC1 rear L_IS
 
@@ -191,7 +193,7 @@ ADC1 remains enabled for the sixth direct current-sense signal.
 | PB9 | `MOTOR1_EN` | Drives center-driver R_EN and L_EN together; PB8 is center LPWM. |
 | PB10 | `MOTOR2_EN` | Drives rear-driver R_EN and L_EN together. |
 
-PB1, PB11, and PB13 become free GPIO reserve. Each motor still has an
+PB1, PB11, and PB13 are free GPIO reserve. Each motor still has an
 independent enable output, so a faulted motor can be disabled without cutting
 power to the other two. Fit a 10 kohm pull-down on every common-enable net.
 
@@ -225,8 +227,8 @@ power to the other two. Fit a 10 kohm pull-down on every common-enable net.
 | Nominal time segment 2 | `4` | Sample point is `(1 + 29) / 34 = 88.2%`. |
 | Nominal SJW | `4` | Within TSEG2 and tolerant of oscillator/edge error. |
 | Result | 500000 bit/s | `170 MHz / (10 * 34) = 500 kbit/s`. |
-| Standard filters | At least `1` | `fw_update_service` installs exact command-ID filter at index 0. |
-| RX FIFO0 / TX FIFO | At least one 8-byte element each | All current protocol frames are Classic CAN DLC 8 or smaller. |
+| Standard filters | `1` | `fw_update_service` installs the exact command-ID filter at index 0. |
+| Message RAM / TX mode | STM32G4 fixed layout / TX FIFO operation | The G4 HAL does not expose the generic CubeMX FIFO element-count fields. All current protocol frames are Classic CAN DLC 8 or smaller and arrive through RX FIFO0. |
 
 The running application's current FDCAN service only handles the safe request
 to enter the bootloader. It rejects other incoming identifiers until the full

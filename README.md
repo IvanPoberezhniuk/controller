@@ -69,10 +69,10 @@ Build both role-specific bootloaders and applications:
 .\tools\build-update-images.ps1
 ```
 
-After applying the documented final CubeMX FDCAN/TIM16 pin migration, use
-`-FinalPinout`. A blank STM32 receives its matching custom bootloader once over
-USART2 using the factory ROM bootloader. An external Linux service computer
-with USB-CAN can then upload application images through SocketCAN:
+The checked-in CubeMX project already contains the final FDCAN/TIM16 pinout.
+A blank STM32 receives its matching custom bootloader once over USART2 using
+the factory ROM bootloader. An external Linux service computer with USB-CAN
+can then upload application images through SocketCAN:
 
 ```bash
 python3 tools/ugv_can_update.py --interface can0 --node left \
@@ -112,10 +112,10 @@ Peripheral drivers are added independently after hardware validation.
 
 The STM32 motor firmware is still at motor-node bring-up stage. The custom
 FDCAN bootloader, power-loss-safe flash state machine, application handoff, and
-Linux SocketCAN updater are implemented and host-tested. FDCAN is not yet enabled
-in the checked-in CubeMX application project. Direct six-channel current
-sampling is implemented against the checked-in ADC1/ADC2 scan configuration;
-its amperes-per-volt scale still requires calibration against the selected
+Linux SocketCAN updater are implemented and host-tested. FDCAN1, TIM16, the
+three common-enable GPIOs, and direct six-channel current sampling are enabled
+in the checked-in CubeMX application project. The current-sense
+amperes-per-volt scale still requires calibration against the selected
 motor-driver hardware. `UGV_CURRENT_SENSE_CALIBRATED` remains `0`, so firmware
 does not treat placeholder readings as valid current measurements.
 

@@ -3,10 +3,9 @@
 This file is the harness reference for the current architecture. Label both
 ends of every wire with the signal name; color alone is not an identifier.
 
-`FINAL` means the pin is already represented in source/configuration.
-`PLANNED CubeMX` means the allocation is fixed in the bootloader and hand-written
-code, but the generated STM32 `.ioc` still needs the documented manual edit.
-Do not power the motor harness until that regeneration is complete.
+`FINAL` means the pin is represented in the checked-in source and CubeMX
+configuration. It does not replace electrical validation: keep motor power
+disconnected until the harness has been continuity-checked.
 
 ## System interconnect
 
@@ -206,7 +205,7 @@ the three left wheels; the Right board connects them to the three right wheels.
 | Center / motor1 | Encoder A | `PB4` | Brown | FINAL |
 | Center / motor1 | Encoder B | `PB5` | Pink | FINAL |
 | Center / motor1 | RPWM | `PA10` | Orange | FINAL |
-| Center / motor1 | LPWM | `PB8` (`TIM16_CH1`) | Yellow | PLANNED CubeMX |
+| Center / motor1 | LPWM | `PB8` (`TIM16_CH1`) | Yellow | FINAL |
 | Center / motor1 | `R_EN` + `L_EN`, tied together | `PB9` | Green | FINAL common enable |
 | Rear / motor2 | Encoder A | `PB6` | Brown | FINAL |
 | Rear / motor2 | Encoder B | `PB7` | Pink | FINAL |
@@ -241,16 +240,15 @@ within `0-3.3 V`. Add the divider/buffer, RC filtering, and input protection
 required by the selected motor-driver module. Never connect an unverified 5 V
 sense output directly to the STM32.
 
-`PB1`, `PB11`, and `PB13` become free GPIO reserve after the documented CubeMX
-regeneration. Leave them unconnected until then because the checked-in
-generated GPIO initialization still contains the old enable configuration.
+`PB1`, `PB11`, and `PB13` are free GPIO reserve. Leave them unconnected until a
+future function is deliberately added to both the schematic and CubeMX file.
 
 ### STM32 SN65HVD230 CAN transceiver
 
 | From | To | Color | Status / note |
 | --- | --- | --- | --- |
-| STM32 `PA12 / FDCAN1_TX` | SN65HVD230 `D/TXD` | Orange | PLANNED CubeMX; 10 kohm pull-up to 3V3 |
-| SN65HVD230 `R/RXD` | STM32 `PA11 / FDCAN1_RX` | White | PLANNED CubeMX |
+| STM32 `PA12 / FDCAN1_TX` | SN65HVD230 `D/TXD` | Orange | FINAL; 10 kohm pull-up to 3V3 |
+| SN65HVD230 `R/RXD` | STM32 `PA11 / FDCAN1_RX` | White | FINAL |
 | STM32 `3V3` | SN65HVD230 `VCC` | Red, label `3V3` | Never connect to 5 V |
 | STM32 `GND` | Transceiver `GND` | Black | Common signal reference |
 | Transceiver `CANH` | CAN-H trunk | Yellow | Twisted with CAN-L |
@@ -260,8 +258,7 @@ generated GPIO initialization still contains the old enable configuration.
 
 PA11/PA12 connect only to the transceiver logic pins, never directly to
 CAN-H/CAN-L. Place 100 nF at VCC/GND and SM24CANB at the bus connector. The
-bootloader already configures these pins; the application starts using them
-after the manual CubeMX migration.
+bootloader and application both configure these pins.
 
 ### STM32 service connections
 

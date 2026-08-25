@@ -19,16 +19,8 @@ Run from the repository root on the development PC:
 .\tools\build-update-images.ps1
 ```
 
-After the final CubeMX pin migration described in
-[`cubemx-configuration.md`](cubemx-configuration.md), build with the real CAN
-and TIM16 pinout enabled:
-
-```powershell
-.\tools\build-update-images.ps1 -FinalPinout
-```
-
-Do not use `-FinalPinout` before CubeMX has generated `hfdcan1`, `htim16`, and
-the final GPIO labels. The outputs are:
+The final FDCAN/TIM16/common-enable pinout is already generated and is always
+used by this command. The outputs are:
 
 | Node | One-time image at `0x08000000` | CAN application image |
 | --- | --- | --- |

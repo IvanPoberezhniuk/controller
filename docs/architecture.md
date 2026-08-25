@@ -141,9 +141,8 @@ reported GPS interference when RF and GNSS hardware are placed close together.
 The CAN update protocol, STM32 bootloader, flash validation/recovery logic,
 application-to-bootloader handoff, and Linux SocketCAN service uploader are
 implemented and host-tested, but not yet validated on assembled hardware. The
-checked-in CubeMX project still has the legacy pinout; its manual FDCAN/TIM16/
-common-enable migration is documented separately. The six direct current-sense
-ADC inputs are already represented in the checked-in CubeMX project.
+checked-in CubeMX project contains the final FDCAN1, TIM16, common-enable, and
+six direct current-sense ADC configuration.
 
 The application-side FDCAN code currently owns only the update-entry filter.
 The normal STM32 motion-command and telemetry dispatcher, ESP32 CRSF parsing,
