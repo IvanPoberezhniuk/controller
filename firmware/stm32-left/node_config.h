@@ -8,7 +8,6 @@
 #define UGV_NODE_CAN_ID          UGV_CAN_NODE_LEFT
 #define UGV_NODE_TELEMETRY_ID    UGV_CAN_MSG_TELEMETRY_LEFT
 #define UGV_NODE_FAULT_ID        UGV_CAN_MSG_FAULT_LEFT
-#define UGV_NODE_TEMPERATURES_ID UGV_CAN_MSG_TEMPS_LEFT
 
 /* Verify signs on the assembled drivetrain before enabling closed-loop motion. */
 #define UGV_MOTOR_FRONT_DIRECTION  (+1)

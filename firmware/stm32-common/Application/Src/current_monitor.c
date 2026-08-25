@@ -11,8 +11,7 @@
 
 /* The intended hardware routes all current-sense lines through one local
  * CD74HC4067 into a single MUX_SIG ADC input. Channels 0-5 are R_IS/L_IS;
- * channels 6-8 are reserved for the three motor temperatures. Temperature
- * acquisition is not implemented until the sensor type is selected. */
+ * channels 6-15 are unconnected reserve in the current build. */
 /* CD74HC4067 channel-select settle time: on-resistance (~100 ohm typical)
  * charging the ADC sample-and-hold plus stray capacitance on the shared SIG
  * trace. A few microseconds of margin costs nothing against the 2 ms

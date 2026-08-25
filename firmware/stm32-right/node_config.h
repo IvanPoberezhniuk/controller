@@ -8,7 +8,6 @@
 #define UGV_NODE_CAN_ID          UGV_CAN_NODE_RIGHT
 #define UGV_NODE_TELEMETRY_ID    UGV_CAN_MSG_TELEMETRY_RIGHT
 #define UGV_NODE_FAULT_ID        UGV_CAN_MSG_FAULT_RIGHT
-#define UGV_NODE_TEMPERATURES_ID UGV_CAN_MSG_TEMPS_RIGHT
 
 /* Keep neutral defaults until motor and encoder polarity is measured. */
 #define UGV_MOTOR_FRONT_DIRECTION  (+1)

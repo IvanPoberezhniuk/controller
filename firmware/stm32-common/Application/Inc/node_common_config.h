@@ -17,8 +17,6 @@
 #define UGV_MUX_CH_MOTOR1_LIS  3u
 #define UGV_MUX_CH_MOTOR2_RIS  4u
 #define UGV_MUX_CH_MOTOR2_LIS  5u
-#define UGV_MUX_CH_MOTOR0_TEMP 6u
-#define UGV_MUX_CH_MOTOR1_TEMP 7u
-#define UGV_MUX_CH_MOTOR2_TEMP 8u
+/* CD74HC4067 channels 6-15 remain unassigned. */
 
 #endif /* UGV_STM32_NODE_COMMON_CONFIG_H */
