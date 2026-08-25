@@ -1,6 +1,6 @@
 ---
 name: ugv-power-electrical
-description: TRIGGER when discussing the UGV's battery/BMS/charging, power rail distribution, Raspberry Pi power supply, current/voltage sensing, motor/board temperature sensing, or wiring/EMC practices.
+description: TRIGGER when discussing the UGV's battery/BMS/charging, power rail distribution, Raspberry Pi power supply, current/voltage sensing, board/driver temperature monitoring, or wiring/EMC practices.
 ---
 
 # UGV power and electrical
@@ -97,19 +97,12 @@ current, Pi supply voltage, motor-controller supply voltage. Used for: energy
 consumption, stall detection, traction diagnostics, driver selection, fuse
 validation, 2WD/4WD/6WD comparison, estimated battery runtime.
 
-## Temperature sensing
-
-Motor-temperature sensors are not part of the initial build. The confirmed
-six-wire motor harness exposes motor power +/-, encoder supply +/-, and
-encoder A/B only. The specified `-40...120 C` is an operating range, not a
-sensor output. Do not add temperature wiring to this harness or assume a
-built-in sensor exists.
+## Temperature monitoring
 
 Driver, STM32-board, battery-area, and Pi-area thermal protection/monitoring
-remain separate requirements. If motor-temperature monitoring is added later,
-use an explicit external sensor and validate its interface before allocating
-pins or wiring. Use filtering and plausibility checks for any long analog lead
-near motor wiring.
+remain requirements. Validate each interface before allocating pins or wiring,
+and use filtering and plausibility checks for any long analog lead near motor
+wiring.
 
 ## Wiring and EMC
 

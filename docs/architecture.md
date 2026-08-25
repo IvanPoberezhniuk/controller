@@ -153,8 +153,5 @@ Pi Wi-Fi protocol remain separate milestones. Until those transports are
 finished and hardware-tested, USART2 remains the motor-node bench command
 interface.
 
-Motor-temperature sensing is explicitly deferred. The confirmed motor cable
-does not expose a temperature signal, so MUX channels 6-15 remain unconnected.
-Reserved temperature fields and CAN identifiers stay in the protocol for a
-future external-sensor revision, but they must not be used for safety decisions
-unless their validity bits are set by implemented and tested hardware.
+Only MUX channels 0-5 are assigned to R_IS/L_IS current sensing. Channels 6-15
+remain unconnected reserve.

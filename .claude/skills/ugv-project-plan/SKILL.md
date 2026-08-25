@@ -57,8 +57,8 @@ motor operation.
 
 ### Phase 9: full power and thermal test
 All-six startup current, straight driving current, turning current,
-blocked-wheel current, 2WD/4WD/6WD consumption, Pi rail stability, motor/
-driver temperatures, battery sag, CAN error rate. **Deliverable:** final
+blocked-wheel current, 2WD/4WD/6WD consumption, Pi rail stability, driver
+temperatures, battery sag, CAN error rate. **Deliverable:** final
 fuse, cable, driver, cooling, and software-limit values.
 
 ### Phase 10: auxiliary systems
@@ -96,7 +96,6 @@ Not yet final — do not represent as confirmed:
 - final per-motor current limit;
 - exact motor startup current from battery;
 - exact encoder counts per output-shaft revolution;
-- future external motor-temperature sensor type (deferred from initial build);
 - final current-sensor hardware;
 - final fuse values after full-load measurement;
 - exact 2WD and 4WD motor mapping;
@@ -120,8 +119,6 @@ Do not return to these without a documented reason:
 - relying on Raspberry Pi Linux for real-time wheel PID and failsafe;
 - placing Raspberry Pi permanently on the CAN trunk instead of using Wi-Fi/IP;
 - sending HD video through ELRS;
-- treating the motor's specified `-40...120 C` operating range as evidence of
-  a temperature-sensor output;
 - using seller peak-current claims as design values;
 - continuing to use the old unsupported approximately 80 A drivetrain
   estimate as confirmed fact;

@@ -15,8 +15,6 @@ Minimum slow telemetry: pack voltage, pack current, battery SOC (when
 trustworthy), driver temperatures when instrumented, Pi temperature, STM32
 temperatures, total distance, per-wheel distance, fault counters, reset reason,
 firmware versions, uptime, Wi-Fi status, ELRS RSSI/link quality when available.
-Motor temperatures are reserved future telemetry and remain unavailable in
-the initial build.
 
 Telemetry must include units and validity flags.
 

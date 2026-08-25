@@ -75,8 +75,7 @@ ui/
 The PC application should show video, connection state, wheel speeds,
 battery data, available controller temperatures, current data, CAN/command
 status, active drive mode, faults; provide emergency stop; record operator
-commands and received telemetry. Motor temperatures remain unavailable until
-external sensors are added in a future revision.
+commands and received telemetry.
 
 **Do not make the PC application the sole location of safety logic** — that
 must remain on STM32 regardless of PC state.

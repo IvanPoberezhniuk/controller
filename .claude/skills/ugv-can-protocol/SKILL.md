@@ -60,9 +60,6 @@ impossible target values, stale counters, out-of-range values.
 0x190 — left-node fault report
 0x191 — right-node fault report
 
-0x1A0 — reserved future left-node temperatures + validity mask; not produced
-0x1A1 — reserved future right-node temperatures + validity mask; not produced
-
 0x710 / 0x711 — left/right STM32 heartbeat
 0x720 — reserved former Raspberry Pi CAN heartbeat
 0x740 — ESP32 AUX heartbeat

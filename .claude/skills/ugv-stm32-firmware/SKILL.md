@@ -12,8 +12,7 @@ enable control, encoder counting, wheel-speed calculation, per-wheel PID
 control, acceleration/deceleration ramping, command-timeout detection,
 emergency-stop response, watchdog handling, current-sensor acquisition (when
 added), local fault detection, CAN communication, local telemetry publication,
-and deterministic safe-state entry. Motor-temperature acquisition is deferred;
-the current motor harness has no temperature output.
+and deterministic safe-state entry.
 
 A motor-control STM32 must be able to stop its motors safely even if the
 ESP32 crashes, CAN stops, the operator connection is lost, Raspberry Pi/Linux
