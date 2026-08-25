@@ -37,11 +37,6 @@ bool ugv_can_encode_fault_report(uint8_t *payload, size_t size,
 bool ugv_can_decode_fault_report(ugv_can_fault_report_t *message,
                                  const uint8_t *payload, size_t size);
 
-bool ugv_can_encode_temperatures(uint8_t *payload, size_t size,
-                                 const ugv_can_temperatures_t *message);
-bool ugv_can_decode_temperatures(ugv_can_temperatures_t *message,
-                                 const uint8_t *payload, size_t size);
-
 bool ugv_can_encode_heartbeat(uint8_t *payload, size_t size,
                               const ugv_can_heartbeat_t *message);
 bool ugv_can_decode_heartbeat(ugv_can_heartbeat_t *message,

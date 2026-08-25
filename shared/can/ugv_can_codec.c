@@ -240,36 +240,6 @@ bool ugv_can_decode_fault_report(ugv_can_fault_report_t *message,
     return true;
 }
 
-bool ugv_can_encode_temperatures(uint8_t *payload, size_t size,
-                                 const ugv_can_temperatures_t *message)
-{
-    if (!can_encode(payload, size, message, UGV_CAN_TEMPS_LEFT_DLC) ||
-        (message->valid_mask & 0xf8u) != 0u) {
-        return false;
-    }
-    payload[0] = message->sequence;
-    payload[1] = message->valid_mask;
-    write_i16_le(&payload[2], message->front_centi_c);
-    write_i16_le(&payload[4], message->center_centi_c);
-    write_i16_le(&payload[6], message->rear_centi_c);
-    return true;
-}
-
-bool ugv_can_decode_temperatures(ugv_can_temperatures_t *message,
-                                 const uint8_t *payload, size_t size)
-{
-    if (!can_decode(message, payload, size, UGV_CAN_TEMPS_LEFT_DLC) ||
-        (payload[1] & 0xf8u) != 0u) {
-        return false;
-    }
-    message->sequence = payload[0];
-    message->valid_mask = payload[1];
-    message->front_centi_c = read_i16_le(&payload[2]);
-    message->center_centi_c = read_i16_le(&payload[4]);
-    message->rear_centi_c = read_i16_le(&payload[6]);
-    return true;
-}
-
 bool ugv_can_encode_heartbeat(uint8_t *payload, size_t size,
                               const ugv_can_heartbeat_t *message)
 {

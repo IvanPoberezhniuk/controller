@@ -104,19 +104,6 @@ static void test_fault_report(void)
     assert(memcmp(&decoded, &source, sizeof(source)) == 0);
 }
 
-static void test_temperatures(void)
-{
-    const ugv_can_temperatures_t source = {3u, 0x05u, 2345, -1000, 32767};
-    uint8_t payload[UGV_CAN_TEMPS_LEFT_DLC] = {0};
-    ugv_can_temperatures_t decoded = {0};
-
-    assert(ugv_can_encode_temperatures(payload, sizeof(payload), &source));
-    assert(ugv_can_decode_temperatures(&decoded, payload, sizeof(payload)));
-    assert(memcmp(&decoded, &source, sizeof(source)) == 0);
-    payload[1] = 0x80u;
-    assert(!ugv_can_decode_temperatures(&decoded, payload, sizeof(payload)));
-}
-
 static void test_heartbeat(void)
 {
     const ugv_can_heartbeat_t source = {1u, 1u, 3u, 0x55u, 0x89abcdefu};
@@ -148,7 +135,6 @@ int main(void)
     test_control_status();
     test_motor_telemetry();
     test_fault_report();
-    test_temperatures();
     test_heartbeat();
     test_invalid_arguments_and_lengths();
     puts("all CAN codec tests passed");

@@ -1,4 +1,4 @@
-VERSION "1.2"
+VERSION "2.0"
 
 NS_ :
     NS_DESC_
@@ -78,20 +78,6 @@ BO_ 401 FaultRight: 8 STM32_RIGHT
  SG_ FrontFaults : 16|16@1+ (1,0) [0|65535] "" RPI,ESP32_AUX
  SG_ CenterFaults : 32|16@1+ (1,0) [0|65535] "" RPI,ESP32_AUX
  SG_ RearFaults : 48|16@1+ (1,0) [0|65535] "" RPI,ESP32_AUX
-
-BO_ 416 TempsLeft: 8 STM32_LEFT
- SG_ Sequence : 0|8@1+ (1,0) [0|255] "" RPI,ESP32_AUX
- SG_ ValidMask : 8|8@1+ (1,0) [0|7] "" RPI,ESP32_AUX
- SG_ FrontTemperature : 16|16@1- (0.01,0) [-327.68|327.67] "degC" RPI,ESP32_AUX
- SG_ CenterTemperature : 32|16@1- (0.01,0) [-327.68|327.67] "degC" RPI,ESP32_AUX
- SG_ RearTemperature : 48|16@1- (0.01,0) [-327.68|327.67] "degC" RPI,ESP32_AUX
-
-BO_ 417 TempsRight: 8 STM32_RIGHT
- SG_ Sequence : 0|8@1+ (1,0) [0|255] "" RPI,ESP32_AUX
- SG_ ValidMask : 8|8@1+ (1,0) [0|7] "" RPI,ESP32_AUX
- SG_ FrontTemperature : 16|16@1- (0.01,0) [-327.68|327.67] "degC" RPI,ESP32_AUX
- SG_ CenterTemperature : 32|16@1- (0.01,0) [-327.68|327.67] "degC" RPI,ESP32_AUX
- SG_ RearTemperature : 48|16@1- (0.01,0) [-327.68|327.67] "degC" RPI,ESP32_AUX
 
 BO_ 1808 HeartbeatLeft: 8 STM32_LEFT
  SG_ ProtocolMajor : 0|8@1+ (1,0) [0|255] "" RPI,ESP32_AUX

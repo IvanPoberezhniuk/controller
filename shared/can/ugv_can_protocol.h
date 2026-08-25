@@ -10,8 +10,8 @@
  * the same message IDs and DLCs as UGV_CAN_MESSAGE_TABLE.
  */
 
-#define UGV_CAN_PROTOCOL_VERSION_MAJOR 1u
-#define UGV_CAN_PROTOCOL_VERSION_MINOR 2u
+#define UGV_CAN_PROTOCOL_VERSION_MAJOR 2u
+#define UGV_CAN_PROTOCOL_VERSION_MINOR 0u
 
 #define UGV_CAN_BITRATE_BPS             500000u
 #define UGV_CAN_COMMAND_PERIOD_MS_MIN   10u
@@ -40,8 +40,6 @@ typedef enum {
     X(TELEMETRY_RIGHT, TelemetryRight, 0x181, 8u) \
     X(FAULT_LEFT,      FaultLeft,      0x190, 8u) \
     X(FAULT_RIGHT,     FaultRight,     0x191, 8u) \
-    X(TEMPS_LEFT,      TempsLeft,      0x1A0, 8u) \
-    X(TEMPS_RIGHT,     TempsRight,     0x1A1, 8u) \
     X(HEARTBEAT_LEFT,  HeartbeatLeft,  0x710, 8u) \
     X(HEARTBEAT_RIGHT, HeartbeatRight, 0x711, 8u) \
     X(HEARTBEAT_PI,    HeartbeatPi,    0x720, 8u) \
@@ -127,11 +125,10 @@ typedef struct {
 } ugv_can_motor_telemetry_t;
 
 typedef enum {
-    UGV_CAN_MOTOR_FAULT_STALLED         = 1u << 0,
-    UGV_CAN_MOTOR_FAULT_OVERCURRENT     = 1u << 1,
-    UGV_CAN_MOTOR_FAULT_OVERTEMPERATURE = 1u << 2,
-    UGV_CAN_MOTOR_FAULT_DRIVER          = 1u << 3,
-    UGV_CAN_MOTOR_FAULT_ENCODER         = 1u << 4,
+    UGV_CAN_MOTOR_FAULT_STALLED     = 1u << 0,
+    UGV_CAN_MOTOR_FAULT_OVERCURRENT = 1u << 1,
+    UGV_CAN_MOTOR_FAULT_DRIVER      = 1u << 2,
+    UGV_CAN_MOTOR_FAULT_ENCODER     = 1u << 3,
 } ugv_can_motor_fault_flag_t;
 
 /* 0x190/0x191, one 16-bit fault mask per local motor. */
@@ -142,15 +139,6 @@ typedef struct {
     uint16_t center_faults;
     uint16_t rear_faults;
 } ugv_can_fault_report_t;
-
-/* 0x1A0/0x1A1. Temperatures use signed centi-degrees Celsius. */
-typedef struct {
-    uint8_t sequence;
-    uint8_t valid_mask; /* bits 0..2: front, center, rear */
-    int16_t front_centi_c;
-    int16_t center_centi_c;
-    int16_t rear_centi_c;
-} ugv_can_temperatures_t;
 
 typedef struct {
     uint8_t protocol_major;
