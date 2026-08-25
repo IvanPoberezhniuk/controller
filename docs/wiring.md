@@ -110,32 +110,57 @@ to CAN-H/CAN-L.
 | `VCC` | `3V3` | Red, label `3V3` | If the module requires power |
 | `GND` | `GND` | Black | FINAL |
 
-### IMU and ambient-light sensor bus
+### QMI8658A IMU, M100-5883 compass, and ambient-light I2C bus
 
-Both devices share this I2C bus. Give each module a unique address.
+The QMI8658A IMU and the compass integrated in the HGLRC M100-5883 share the
+sensor I2C bus with the still-unselected ambient-light sensor. Start this bus
+at 100 kHz because the compass cable runs away from the ESP32 enclosure.
 
 | Device pin | ESP32 | Color | Status / note |
 | --- | --- | --- | --- |
-| IMU/light `VCC` | `3V3` | Red, label `3V3` | Confirm exact modules before power-up |
-| IMU/light `GND` | `GND` | Black | FINAL |
-| IMU/light `SDA` | `GPIO1` | Blue | FINAL |
-| IMU/light `SCL` | `GPIO2` | Yellow | FINAL |
-| IMU `INT/DRDY` | `GPIO7` | White | FINAL but optional |
+| QMI8658A `VCC` | `3V3` | Red, label `3V3` | FINAL; the IC itself must not receive 5 V |
+| QMI8658A `GND` | `GND` | Black | FINAL |
+| QMI8658A `SDA` | `GPIO1` | Blue | FINAL; expected address `0x6A` or `0x6B` from SA0 |
+| QMI8658A `SCL` | `GPIO2` | Yellow | FINAL |
+| QMI8658A `INT1/DRDY`, if exposed | `GPIO7` | White | FINAL but optional; otherwise poll over I2C |
+| M100-5883 `SDA` | `GPIO1` | Blue | FINAL; integrated compass, expected `0x0D`, verify by scan |
+| M100-5883 `SCL` | `GPIO2` | Yellow | FINAL |
+| Ambient-light `SDA/SCL` | `GPIO1/GPIO2` | Blue / Yellow | PLANNED; select a non-conflicting address |
+
+QMI8658A supports 7-bit I2C address `0x6A` when SA0 is high/unconnected and
+`0x6B` when SA0 is low. Its `WHO_AM_I` register at `0x00` should return `0x05`.
+The exact 5883-compatible compass fitted to individual HGLRC module revisions
+must be confirmed by an I2C scan rather than assumed from the product name.
 
 Install only one effective SDA pull-up and one SCL pull-up set for the complete
-bus. Parallel pull-ups already fitted to breakout boards can become too strong.
+bus. Before connection, power each module separately and verify that idle SDA
+and SCL do not exceed 3.3 V. Parallel pull-ups already fitted to the QMI,
+M100-5883, and future light-sensor boards can become too strong.
 
-### GPS UART
+### HGLRC M100-5883 GPS UART and compass
 
-The GPS model and its supply voltage are not finalized. Do not connect its
-power until the module label/datasheet is checked.
+The confirmed module is HGLRC M100-5883: M10-class multi-constellation GPS
+with integrated compass, default UART 115200 baud and 10 Hz navigation output.
 
-| GPS pin | ESP32 | Color | Status / note |
+| M100-5883 pin | ESP32 | Color | Status / note |
 | --- | --- | --- | --- |
-| GPS `TX` | `GPIO16` (`GPS_RX`) | White | FINAL; UART signals cross |
-| GPS `RX` | `GPIO15` (`GPS_TX`) | Orange | FINAL |
-| GPS `GND` | `GND` | Black | FINAL |
-| GPS `VCC` | Module-rated rail | Red, label voltage | TBD by exact GPS module |
+| `TX` | `GPIO16` (`GPS_RX`) | White | FINAL; UART signals cross |
+| `RX` | `GPIO15` (`GPS_TX`) | Orange | FINAL |
+| `SDA` | `GPIO1` | Blue | FINAL; compass I2C, not GPS UART data |
+| `SCL` | `GPIO2` | Yellow | FINAL; compass I2C |
+| `GND` | `GND` | Black | FINAL |
+| `5V` | Regulated `5V` sensor rail | Red, label `5V` | FINAL; HGLRC specifies 3.3-5 V input |
+
+The manufacturer does not separately specify UART/I2C pad-high voltage. Power
+the module from 5 V on the bench and measure idle TX, SDA, and SCL before direct
+ESP32 connection; all must be at most 3.3 V. Capture the initial UART stream to
+identify its actual NMEA/vendor protocol before implementing the parser.
+
+Mount the ceramic GPS antenna facing the sky. Keep the module away from XR4
+antennas, motors, steel brackets, speakers, battery leads, and DC/DC converters.
+After final assembly perform compass offset/scale calibration in the installed
+position; calibration done on the bench is invalid after nearby metal or
+high-current wiring moves.
 
 ### Lights and buzzer
 
