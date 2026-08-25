@@ -110,18 +110,6 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
 
-  /* CubeMX 6.18 records ADC12CLockSelection in the .ioc but does not emit
-   * RCC_CommonPeriphClockConfig for STM32G431. Select the kernel clock here,
-   * before either ADC is initialized, so the async /8 prescaler yields
-   * 21.25 MHz from the 170 MHz SYSCLK. */
-  RCC_PeriphCLKInitTypeDef periph_clk_init = {0};
-  periph_clk_init.PeriphClockSelection = RCC_PERIPHCLK_ADC12;
-  periph_clk_init.Adc12ClockSelection = RCC_ADC12CLKSOURCE_SYSCLK;
-  if (HAL_RCCEx_PeriphCLKConfig(&periph_clk_init) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
