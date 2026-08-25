@@ -9,7 +9,8 @@ Responsibilities:
 - Classic CAN/TWAI link through an external 3.3 V CAN transceiver;
 - RadioMaster XR4 receiver over full-duplex CRSF at 420000 baud;
 - SH1106 128x64 OLED and rotary encoder UI;
-- IMU, ambient-light sensor, and GPS;
+- QMI8658A six-axis IMU, HGLRC M100-5883 GPS/compass, and a future
+  ambient-light sensor;
 - vehicle lighting and a local warning buzzer;
 - future Wi-Fi/IP link to Raspberry Pi for autonomy requests and relayed
   telemetry.
