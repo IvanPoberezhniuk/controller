@@ -11,10 +11,9 @@ description: TRIGGER when discussing the UGV project's implementation phases/seq
 Document exact motor labels/gearbox ratio; measure one motor (no-load
 current, startup current, controlled stall current, current under
 representative wheel load, encoder counts per output revolution); identify
-encoder voltage/output type; identify motor temperature sensor type; select
-and test one motor driver; verify battery/BMS configuration; establish safe
-bench power and fuse limits. **Deliverable:** validated single-motor
-electrical report.
+encoder voltage/output type; select and test one motor driver; verify
+battery/BMS configuration; establish safe bench power and fuse limits.
+**Deliverable:** validated single-motor electrical report.
 
 ### Phase 2: one-motor STM32 prototype
 One hardware encoder, one PWM output, direction/enable, fixed speed target,
@@ -24,7 +23,7 @@ targets safely.
 
 ### Phase 3: three-motor node
 Three hardware encoders, three drivers, three independent control loops,
-motor-state array, thermal inputs, fault manager, acceleration limiting,
+motor-state array, current inputs, fault manager, acceleration limiting,
 synchronized update loop. **Deliverable:** one complete side operates on a
 test stand.
 
@@ -97,7 +96,7 @@ Not yet final — do not represent as confirmed:
 - final per-motor current limit;
 - exact motor startup current from battery;
 - exact encoder counts per output-shaft revolution;
-- exact temperature-sensor type;
+- future external motor-temperature sensor type (deferred from initial build);
 - final current-sensor hardware;
 - final fuse values after full-load measurement;
 - exact 2WD and 4WD motor mapping;
@@ -121,6 +120,8 @@ Do not return to these without a documented reason:
 - relying on Raspberry Pi Linux for real-time wheel PID and failsafe;
 - placing Raspberry Pi permanently on the CAN trunk instead of using Wi-Fi/IP;
 - sending HD video through ELRS;
+- treating the motor's specified `-40...120 C` operating range as evidence of
+  a temperature-sensor output;
 - using seller peak-current claims as design values;
 - continuing to use the old unsupported approximately 80 A drivetrain
   estimate as confirmed fact;

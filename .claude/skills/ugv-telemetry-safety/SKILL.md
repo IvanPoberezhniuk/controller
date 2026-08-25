@@ -12,10 +12,11 @@ six PWM outputs, active drive mode, command sequence, command age, node
 heartbeat, CAN status, system enabled state.
 
 Minimum slow telemetry: pack voltage, pack current, battery SOC (when
-trustworthy), six motor temperatures, driver temperatures, Pi temperature,
-STM32 temperatures, total distance, per-wheel distance, fault counters, reset
-reason, firmware versions, uptime, Wi-Fi status, ELRS RSSI/link quality when
-available.
+trustworthy), driver temperatures when instrumented, Pi temperature, STM32
+temperatures, total distance, per-wheel distance, fault counters, reset reason,
+firmware versions, uptime, Wi-Fi status, ELRS RSSI/link quality when available.
+Motor temperatures are reserved future telemetry and remain unavailable in
+the initial build.
 
 Telemetry must include units and validity flags.
 
@@ -84,7 +85,8 @@ re-arm; **do not restore the previous motor command automatically.**
 Store configurable values with versioning, e.g.: wheel diameter, encoder
 counts per revolution, motor/encoder direction inversion, PID coefficients,
 PWM dead zone, maximum PWM, acceleration/deceleration rate, command timeout,
-temperature limits, current limits, CAN node ID, drive-mode motor mapping.
+current limits, CAN node ID, drive-mode motor mapping. Temperature limits apply
+only to a future revision with validated sensors.
 
 Requirements: CRC or integrity check; defaults compiled into firmware;
 version field; safe recovery after incompatible update; no unsafe motor

@@ -99,22 +99,23 @@ validation, 2WD/4WD/6WD comparison, estimated battery runtime.
 
 ## Temperature sensing
 
-Motors have/will have temperature-sensor wiring routed alongside power and
-encoder wiring. Required points: six motor temperatures, left/right STM32
-board, selected motor drivers, battery area, Pi area.
+Motor-temperature sensors are not part of the initial build. The confirmed
+six-wire motor harness exposes motor power +/-, encoder supply +/-, and
+encoder A/B only. The specified `-40...120 C` is an operating range, not a
+sensor output. Do not add temperature wiring to this harness or assume a
+built-in sensor exists.
 
-Sensor type not fully confirmed. **Do not assign DS18B20 unless the installed
-motor sensors are confirmed to be digital 1-Wire sensors** — identify each
-sensor electrically first (NTC thermistor, PTC, analog IC, DS18B20, or
-another digital sensor). Use filtering and plausibility checks since motor
-cables are electrically noisy.
+Driver, STM32-board, battery-area, and Pi-area thermal protection/monitoring
+remain separate requirements. If motor-temperature monitoring is added later,
+use an explicit external sensor and validate its interface before allocating
+pins or wiring. Use filtering and plausibility checks for any long analog lead
+near motor wiring.
 
 ## Wiring and EMC
 
-Motor power, encoder signals, and temperature wires may share the same
-factory cable bundle. Requirements: twist motor power pairs where possible;
-twisted pairs for encoder A/B or signal/ground; ground reference for
-sensors; avoid long unshielded high-impedance analog lines; add input
+Motor power and encoder signals share the factory cable bundle. Requirements:
+twist motor power pairs where possible; twisted pairs for encoder A/B or
+signal/ground; avoid long unshielded high-impedance analog lines; add input
 filtering; use Schmitt-trigger-capable inputs where possible; separate
 power/signal connectors on the controller; avoid ground loops; route CAN
 separately from motor leads where practical; proper strain relief; keep
@@ -122,4 +123,4 @@ encoder cables away from PWM switching nodes on the PCB.
 
 Add firmware diagnostics for: impossible encoder speed jumps, encoder
 movement while motor disabled, no encoder movement under sustained command,
-temperature readings outside physical limits, CAN error counts.
+invalid current readings, CAN error counts.

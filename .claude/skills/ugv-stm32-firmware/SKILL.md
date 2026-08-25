@@ -10,10 +10,10 @@ description: TRIGGER when discussing STM32G431 hardware/peripherals, node or pin
 Each STM32 node performs: motor PWM generation, direction control, driver
 enable control, encoder counting, wheel-speed calculation, per-wheel PID
 control, acceleration/deceleration ramping, command-timeout detection,
-emergency-stop response, watchdog handling, motor-temperature acquisition,
-current-sensor acquisition (when added), local fault detection, CAN
-communication, local telemetry publication, and deterministic safe-state
-entry.
+emergency-stop response, watchdog handling, current-sensor acquisition (when
+added), local fault detection, CAN communication, local telemetry publication,
+and deterministic safe-state entry. Motor-temperature acquisition is deferred;
+the current motor harness has no temperature output.
 
 A motor-control STM32 must be able to stop its motors safely even if the
 ESP32 crashes, CAN stops, the operator connection is lost, Raspberry Pi/Linux
@@ -77,7 +77,6 @@ TIM8 PWM channels — additional PWM outputs or synchronized motor control
 FDCAN1 — vehicle CAN bus
 
 ADC + DMA:
-- motor temperatures;
 - driver current measurements when added;
 - controller supply voltage;
 - optional board temperature.
@@ -100,7 +99,7 @@ Wheel PID loop: 200-500 Hz
 CAN command processing: event-driven
 Fast status telemetry: 20-50 Hz
 Detailed diagnostics: 1-10 Hz
-Temperature telemetry: 1-5 Hz
+Future temperature telemetry: 1-5 Hz when sensors exist
 ```
 
 The control loop should be timer-driven, not paced by arbitrary delays in the
@@ -118,9 +117,7 @@ typedef struct {
 
     float pwm_command;
     float current_a;
-    float temperature_c;
     bool current_valid;
-    bool temperature_valid;
 
     float pid_integral;
     float previous_error;
@@ -128,7 +125,6 @@ typedef struct {
     bool enabled;
     bool encoder_valid;
     bool overcurrent;
-    bool overtemperature;
     bool driver_fault;
     bool stalled;
 } MotorState;
