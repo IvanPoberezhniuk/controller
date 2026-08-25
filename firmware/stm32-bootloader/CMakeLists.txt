@@ -49,7 +49,6 @@ endif()
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     USE_HAL_DRIVER
     STM32G431xx
-    HAL_FDCAN_MODULE_ENABLED
     UGV_BOOT_NODE_ID=${UGV_BOOT_NODE_ID_VALUE}
 )
 target_link_libraries(${CMAKE_PROJECT_NAME} m)
