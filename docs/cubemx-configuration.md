@@ -39,6 +39,10 @@ partial migration creates pin conflicts or drives the center motor incorrectly.
 9. Build both OTA applications and bootloaders with
    `tools/build-update-images.ps1 -FinalPinout`. No current-sensing feature
    flag is required.
+10. After the R_IS/L_IS conditioning is installed and calibrated, replace the
+    placeholder `current_sense_scale_a_per_v` and current thresholds, then set
+    `UGV_CURRENT_SENSE_CALIBRATED` to `1`. Do not set it merely because ADC
+    conversion succeeds; the value must represent verified amperes.
 
 The custom bootloader does not use this CubeMX initialization. It configures
 HSI16, PA11/PA12, FDCAN, flash, and safe output levels independently, so it

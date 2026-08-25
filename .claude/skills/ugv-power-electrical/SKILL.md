@@ -98,7 +98,9 @@ amperes-per-volt calibration remain unresolved. Other required measurements:
 total battery voltage, total battery current, Pi supply voltage, and
 motor-controller supply voltage. Used for energy consumption, stall detection,
 traction diagnostics, driver selection, fuse validation, 2WD/4WD/6WD
-comparison, and estimated battery runtime.
+comparison, and estimated battery runtime. Keep
+`UGV_CURRENT_SENSE_CALIBRATED=0` until the physical inputs and conversion scale
+are verified; uncalibrated values must not drive safety decisions.
 
 ## Temperature monitoring
 

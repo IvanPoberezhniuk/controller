@@ -241,7 +241,9 @@ within `0-3.3 V`. Add the divider/buffer, RC filtering, and input protection
 required by the selected motor-driver module. Never connect an unverified 5 V
 sense output directly to the STM32.
 
-`PB1`, `PB11`, and `PB13` are free GPIO reserve after this change.
+`PB1`, `PB11`, and `PB13` become free GPIO reserve after the documented CubeMX
+regeneration. Leave them unconnected until then because the checked-in
+generated GPIO initialization still contains the old enable configuration.
 
 ### STM32 SN65HVD230 CAN transceiver
 

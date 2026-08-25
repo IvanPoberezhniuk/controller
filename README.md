@@ -116,7 +116,8 @@ Linux SocketCAN updater are implemented and host-tested. FDCAN is not yet enable
 in the checked-in CubeMX application project. Direct six-channel current
 sampling is implemented against the checked-in ADC1/ADC2 scan configuration;
 its amperes-per-volt scale still requires calibration against the selected
-motor-driver hardware.
+motor-driver hardware. `UGV_CURRENT_SENSE_CALIBRATED` remains `0`, so firmware
+does not treat placeholder readings as valid current measurements.
 
 See [architecture](docs/architecture.md), [wiring and wire colors](docs/wiring.md),
 [CubeMX configuration](docs/cubemx-configuration.md),
