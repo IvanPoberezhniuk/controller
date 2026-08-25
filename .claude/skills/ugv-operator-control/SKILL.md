@@ -13,7 +13,7 @@ CRSF. Wi-Fi remains the high-bandwidth link.
 
 ```text
 XR4 -> ESP32 MANUAL input
-Raspberry Pi -> ESP32 AUTO request
+Raspberry Pi -> Wi-Fi/IP -> ESP32 AUTO request
 ESP32 -> final CAN command -> STM32 nodes
 ```
 
@@ -22,8 +22,9 @@ basic telemetry (battery voltage, current, RSSI, link quality, GPS, speed,
 heading, temperatures, status/fault flags). **ELRS is not suitable for HD
 video.**
 
-Wi-Fi is appropriate for: video, SSH, configuration, detailed telemetry,
-logs, software updates, future ROS 2 communication.
+Wi-Fi is appropriate for: Pi video, SSH, configuration, detailed telemetry,
+logs, Pi-to-ESP32 future autonomy requests, and future ROS 2 communication.
+Raspberry Pi is not a CAN node.
 
 ## Control authority
 
@@ -56,7 +57,7 @@ core/
 - LogBuffer
 
 io/
-- SerialWorker or network/CAN gateway client
+- SerialWorker or Wi-Fi/network gateway client
 
 input/
 - Keyboard

@@ -1,6 +1,6 @@
 ---
 name: ugv-raspberry-pi
-description: TRIGGER when discussing the UGV's Raspberry Pi 5 responsibilities or services — the CAN gateway, telemetry aggregation, systemd service structure, or Pi-side high-level architecture (not motor PID, which lives on STM32).
+description: TRIGGER when discussing the UGV's Raspberry Pi 5 responsibilities or services — Wi-Fi camera/video, telemetry/logging, systemd service structure, or Pi-side high-level architecture (not CAN or motor PID).
 ---
 
 # UGV Raspberry Pi 5
@@ -19,8 +19,12 @@ The Pi performs: video capture/compression, network communication, PC
 control-station communication, high-level command processing, telemetry
 aggregation, system configuration, logging, future navigation/computer
 vision, optional ROS 2 integration, sending AUTO requests to the ESP32
-command arbiter, presenting faults to the operator, and optional coordination
-of lights/auxiliary modules.
+command arbiter over Wi-Fi/IP, presenting faults to the operator, and optional
+coordination of lights/auxiliary modules.
+
+The Pi has no permanent CAN connection. ESP32 relays selected telemetry over
+Wi-Fi and remains the sole final CAN-command producer. Loss of Pi or Wi-Fi must
+only remove video/network/autonomy; manual ELRS control remains available.
 
 **The Pi must not directly perform timing-critical wheel PID control** —
 Linux scheduling delays must not be able to produce uncontrolled motor
@@ -29,12 +33,12 @@ behavior. That responsibility stays on STM32 (`ugv-stm32-firmware`).
 ## Suggested service structure
 
 ```text
-ugv-control-gateway
+ugv-ip-gateway
 - receives operator commands;
 - validates commands;
-- converts autonomous commands to ESP32 CAN requests;
-- aggregates CAN telemetry;
-- manages heartbeats.
+- sends autonomous requests to ESP32 over authenticated Wi-Fi/IP;
+- receives telemetry relayed by ESP32;
+- manages network heartbeats.
 
 ugv-camera
 - captures the camera;

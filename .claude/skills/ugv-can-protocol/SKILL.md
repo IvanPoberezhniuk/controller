@@ -1,6 +1,6 @@
 ---
 name: ugv-can-protocol
-description: TRIGGER when discussing the UGV's CAN bus — FDCAN transceiver/physical layer, node/message IDs and payload layout, bit rate, or heartbeat/command-timeout behavior between the Raspberry Pi and STM32 nodes.
+description: TRIGGER when discussing the UGV's CAN bus — SN65HVD230/FDCAN/TWAI physical layer, node/message IDs and payload layout, bit rate, or heartbeat/command-timeout behavior between ESP32 and the STM32 nodes.
 ---
 
 # UGV CAN architecture
@@ -8,8 +8,8 @@ description: TRIGGER when discussing the UGV's CAN bus — FDCAN transceiver/phy
 ## Physical layer
 
 STM32G431 includes an FDCAN controller but **not** a physical transceiver —
-an external transceiver is mandatory. Previously available/discussed:
-SN65HVD230.
+an external transceiver is mandatory. The confirmed available transceiver is
+SN65HVD230, powered from 3.3 V. ESP32 uses another SN65HVD230 with TWAI.
 
 Requirements: twisted pair for CANH/CANL; 120 ohm termination at exactly both
 physical ends of the bus; short stubs; common signal ground between nodes;
@@ -23,8 +23,9 @@ but classic CAN is sufficient for initial motor commands and telemetry.
 
 ## Network participants
 
-Initial nodes: Raspberry Pi high-level computer, ESP32 command/AUX node, left
-STM32G431 motor controller, and right STM32G431 motor controller.
+Permanent nodes: ESP32 command/AUX node, left STM32G431 motor controller, and
+right STM32G431 motor controller. Raspberry Pi is Wi-Fi-only. A SocketCAN
+service adapter may join temporarily for bootloader maintenance.
 
 Potential future nodes: battery/BMS gateway, lighting controller, robotic
 arm, turret, suspension controller, detachable wheel modules, sensor module.
@@ -35,9 +36,10 @@ The final motion command contains a sequence counter, drive-mode flags, signed
 left/right RPM targets, and a percentage limit. Enable/emergency stop uses a
 separate frame. Individual six-wheel targets remain an unresolved encoding.
 
-Only ESP32 produces final command IDs 0x100/0x110. Raspberry Pi sends AUTO
-requests on 0x101/0x111, and ESP32 explicitly arbitrates MANUAL CRSF versus
-AUTO. Loss of the selected source stops the vehicle; never auto-switch modes.
+Only ESP32 produces final command IDs 0x100/0x110. Raspberry Pi sends future
+AUTO requests to ESP32 over Wi-Fi/IP, and ESP32 explicitly arbitrates MANUAL
+CRSF versus AUTO. Loss of the selected source stops the vehicle; never
+auto-switch modes.
 
 Motor nodes must reject: malformed frames, invalid length, invalid mode,
 impossible target values, stale counters, out-of-range values.
@@ -46,10 +48,10 @@ impossible target values, stale counters, out-of-range values.
 
 ```text
 0x100 — vehicle motion command
-0x101 — Raspberry Pi autonomous motion request
+0x101 — reserved former Raspberry Pi CAN motion request
 0x110 — system enable / emergency stop
-0x111 — Raspberry Pi autonomous enable request
-0x120 — auxiliary or lighting command
+0x111 — reserved former Raspberry Pi CAN enable request
+0x120 — reserved former Raspberry Pi auxiliary request
 0x130 — ESP32 control-source and CRSF-link status
 
 0x180 — left-node fast telemetry
@@ -62,7 +64,7 @@ impossible target values, stale counters, out-of-range values.
 0x1A1 — right-node temperatures + validity mask
 
 0x710 / 0x711 — left/right STM32 heartbeat
-0x720 — Raspberry Pi gateway heartbeat
+0x720 — reserved former Raspberry Pi CAN heartbeat
 0x740 — ESP32 AUX heartbeat
 ```
 
@@ -78,16 +80,18 @@ Byte 7: reserved
 ```
 
 `shared/can/ugv_can_protocol.h` is the wire contract shared by STM32 firmware,
-ESP32, Raspberry Pi services, PC tooling, and tests. `ugv.dbc` mirrors it for
-CAN tools; run `Tests/can/test_dbc_sync.ps1` after protocol edits.
+ESP32, service tooling, and tests. Raspberry Pi uses a separate Wi-Fi/IP
+contract. `ugv.dbc` mirrors CAN for tools; run
+`Tests/can/test_dbc_sync.ps1` after protocol edits.
 
 Do not assign a six-wheel `int16` target frame until its Classic CAN encoding
 is designed: six values require 12 bytes and cannot fit in one frame.
 
 ## Heartbeat and timeout
 
-ESP32 sends final motion commands at 50-100 Hz. The RC timeout is 100 ms; Pi
-AUTO-request and motor-node final-command timeouts are 300 ms. Values are
-declared centrally in `ugv_can_protocol.h`; tune only after measurement.
+ESP32 sends final motion commands at 50-100 Hz. The RC timeout is 100 ms; the
+future Pi Wi-Fi AUTO-request and motor-node final-command timeouts are 300 ms.
+Values are declared centrally in `ugv_can_protocol.h`; tune only after
+measurement.
 
 **The STM32 must not continue using the last speed command indefinitely.**

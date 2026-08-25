@@ -16,8 +16,8 @@ communication, local telemetry publication, and deterministic safe-state
 entry.
 
 A motor-control STM32 must be able to stop its motors safely even if the
-Raspberry Pi crashes, Linux freezes, CAN stops, the operator connection is
-lost, or invalid commands are received. **The Pi must never perform
+ESP32 crashes, CAN stops, the operator connection is lost, Raspberry Pi/Linux
+freezes, or invalid commands are received. **The Pi must never perform
 timing-critical wheel PID control** — Linux scheduling delays must not be
 able to produce uncontrolled motor behavior.
 
@@ -51,7 +51,7 @@ Example node IDs:
 ```text
 0x10 — left motor controller
 0x11 — right motor controller
-0x20 — Raspberry Pi CAN gateway
+0x20 — reserved former Raspberry Pi CAN gateway
 0x30 — future battery-management gateway
 0x40 — ESP32-S3 auxiliary/UI/lighting controller
 ```

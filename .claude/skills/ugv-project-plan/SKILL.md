@@ -38,12 +38,13 @@ Same firmware, another node ID. Validate left/right symmetry, motor/encoder
 inversion, simultaneous six-motor operation, CAN bus loading, power
 transients, thermal behavior. **Deliverable:** six-wheel bench test.
 
-### Phase 6: ESP32 command gateway and Raspberry Pi integration
+### Phase 6: ESP32 command gateway and Raspberry Pi Wi-Fi integration
 XR4 CRSF parser, ESP32 MANUAL/AUTO control-source manager, TWAI final-command
-publisher, SocketCAN Pi AUTO requests, command heartbeats, telemetry
-aggregation, SQLite logging, service supervision, configuration API.
-**Deliverable:** ESP32 commands both STM32 nodes; Pi requests AUTO motion and
-records telemetry.
+publisher, Pi-to-ESP32 Wi-Fi AUTO requests, command/network heartbeats,
+telemetry relay, SQLite logging, service supervision, configuration API.
+**Deliverable:** ESP32 commands both STM32 nodes; Pi streams camera video,
+requests future AUTO motion over Wi-Fi, and records relayed telemetry without
+joining CAN.
 
 ### Phase 7: manual driving
 Xbox input, PC application, throttle/steering mixing, arming, emergency
@@ -100,7 +101,7 @@ Not yet final — do not represent as confirmed:
 - final fuse values after full-load measurement;
 - exact 2WD and 4WD motor mapping;
 - final lighting hardware;
-- final CAN transceiver and protection circuit;
+- final SN65HVD230 protection/termination circuit;
 - whether BMS CAN is available on the exact JK board;
 - final ELRS command integration;
 - final emergency-stop circuit;
@@ -117,6 +118,7 @@ Do not return to these without a documented reason:
 - treating STM32F411 as if it contains native CAN;
 - placing all six motors on one G431 solely to reduce board count;
 - relying on Raspberry Pi Linux for real-time wheel PID and failsafe;
+- placing Raspberry Pi permanently on the CAN trunk instead of using Wi-Fi/IP;
 - sending HD video through ELRS;
 - using seller peak-current claims as design values;
 - continuing to use the old unsupported approximately 80 A drivetrain

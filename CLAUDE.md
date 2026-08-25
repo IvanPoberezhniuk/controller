@@ -34,9 +34,9 @@ against the unresolved-decisions and rejected-approaches registers in the
 ## Confirmed target architecture
 
 ```text
-Radio + Nomad -> XR4 --CRSF--> ESP32-S3 control/AUX <--CAN--> Raspberry Pi 5
-                                MANUAL/AUTO arbiter           autonomy/logs
-                                OLED/IMU/GPS/lights           camera/audio
+Radio + Nomad -> XR4 --CRSF--> ESP32-S3 control/AUX <--Wi-Fi/IP--> Raspberry Pi 5
+                                MANUAL/AUTO arbiter               autonomy/logs
+                                OLED/IMU/GPS/lights               camera/audio
                                          |
                                   final CAN commands
                                          |
@@ -74,7 +74,8 @@ Firmware repository:
 - one shared STM32 motor-node implementation;
 - separate left/right target configurations and build images;
 - an independent ESP-IDF project for ESP32-S3 AUX;
-- one shared, explicitly encoded CAN protocol.
+- one shared, explicitly encoded CAN protocol for ESP32 and both STM32 nodes;
+- a separate future Wi-Fi/IP protocol between ESP32 and Raspberry Pi.
 ```
 
 ## Agent response rules
@@ -88,7 +89,8 @@ Firmware repository:
 6. Prioritize safe bench validation before vehicle testing.
 7. Keep motor-control safety on STM32; CRSF arbitration, final CAN command
    authority, auxiliary UI/sensors/lighting on ESP32; and video/networking/
-   logging/autonomy requests on Raspberry Pi.
+   logging/autonomy requests on Raspberry Pi. Raspberry Pi is Wi-Fi-only and
+   must not be added to the permanent CAN trunk.
 8. Keep the CAN wire contract in `shared/can/ugv_can_protocol.h` and verify
    its DBC mirror with `Tests/can/test_dbc_sync.ps1`.
 9. Include failure behavior in every implementation.
@@ -113,7 +115,7 @@ Validate one motor and encoder
 -> add CAN
 -> validate separate left/right builds from the shared node firmware
 -> bring up the ESP32 AUX node
--> integrate Raspberry Pi
+-> integrate Raspberry Pi camera/video over Wi-Fi
 -> integrate control station
 -> perform complete electrical and safety testing
 ```
@@ -129,7 +131,7 @@ comes up:
 - `ugv-stm32-firmware` — STM32 hardware/peripherals, node & pin allocation, control-loop design, firmware structure, FreeRTOS decision.
 - `ugv-motor-driver-encoders` — H-bridge driver selection, encoder PPR/calibration.
 - `ugv-can-protocol` — CAN physical layer, node/message IDs, heartbeat/timeout.
-- `ugv-raspberry-pi` — Pi responsibilities and services (gateway, telemetry, supervisor).
+- `ugv-raspberry-pi` — Pi Wi-Fi camera/network responsibilities and services.
 - `ugv-camera-streaming` — camera hardware, capture/streaming pipeline, video usage.
 - `ugv-operator-control` — control devices (Xbox/ELRS/Wi-Fi), PC control-station app.
 - `ugv-power-electrical` — battery/BMS/charging, power rails, current/voltage/temperature sensing, wiring/EMC.
