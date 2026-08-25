@@ -13,8 +13,9 @@ Raspberry Pi 5 as the high-level computer.
 | ESP32 control/AUX | XR4 CRSF receiver, MANUAL/AUTO arbitration, final CAN commands, OLED, encoder UI, QMI8658A IMU, M100-5883 GPS/compass, ambient light, lighting, buzzer |
 | Raspberry Pi 5 | Wi-Fi camera/video, full audio, navigation, networking and logging; no direct CAN connection |
 
-Each STM32 owns one CD74HC4067. Both STM32 targets compile the same motor
-firmware and select only their role-specific configuration at build time.
+Each STM32 reads its six local R_IS/L_IS signals directly through ADC1/ADC2.
+Both STM32 targets compile the same motor firmware and select only their
+role-specific configuration at build time.
 The runtime CAN trunk contains only ESP32 and the two STM32 nodes. Raspberry Pi
 communicates over Wi-Fi/IP and is not part of the manual-control or motor-safety
 path.
@@ -112,10 +113,10 @@ Peripheral drivers are added independently after hardware validation.
 The STM32 motor firmware is still at motor-node bring-up stage. The custom
 FDCAN bootloader, power-loss-safe flash state machine, application handoff, and
 Linux SocketCAN updater are implemented and host-tested. FDCAN is not yet enabled
-in the checked-in CubeMX application project. The CD74HC4067 sampling code and
-logical channel map are ready, but sensing remains a safe no-op until the
-documented GPIO/ADC assignment is added manually and
-`UGV_MUX_GPIO_CONFIGURED` is enabled.
+in the checked-in CubeMX application project. Direct six-channel current
+sampling is implemented against the checked-in ADC1/ADC2 scan configuration;
+its amperes-per-volt scale still requires calibration against the selected
+motor-driver hardware.
 
 See [architecture](docs/architecture.md), [wiring and wire colors](docs/wiring.md),
 [CubeMX configuration](docs/cubemx-configuration.md),

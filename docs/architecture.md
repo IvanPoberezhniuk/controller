@@ -25,10 +25,8 @@
         STM32 Left       STM32 Right
         3 left motors    3 right motors
         encoders         encoders
-        current          current
+        direct ADC       direct ADC
         local safety     local safety
-             |               |
-        CD74HC4067       CD74HC4067
 
  Raspberry Pi 5 ------ Wi-Fi video ------> operator phone/laptop
 ```
@@ -144,7 +142,8 @@ The CAN update protocol, STM32 bootloader, flash validation/recovery logic,
 application-to-bootloader handoff, and Linux SocketCAN service uploader are
 implemented and host-tested, but not yet validated on assembled hardware. The
 checked-in CubeMX project still has the legacy pinout; its manual FDCAN/TIM16/
-MUX migration is documented separately.
+common-enable migration is documented separately. The six direct current-sense
+ADC inputs are already represented in the checked-in CubeMX project.
 
 The application-side FDCAN code currently owns only the update-entry filter.
 The normal STM32 motion-command and telemetry dispatcher, ESP32 CRSF parsing,
@@ -153,5 +152,5 @@ Pi Wi-Fi protocol remain separate milestones. Until those transports are
 finished and hardware-tested, USART2 remains the motor-node bench command
 interface.
 
-Only MUX channels 0-5 are assigned to R_IS/L_IS current sensing. Channels 6-15
-remain unconnected reserve.
+Each STM32 samples its six R_IS/L_IS signals directly: five ADC2 ranks and one
+ADC1 channel. No external analog multiplexer is used.

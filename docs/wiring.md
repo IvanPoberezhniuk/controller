@@ -202,63 +202,46 @@ the three left wheels; the Right board connects them to the three right wheels.
 | Front / motor0 | Encoder B | `PA1` | Pink | FINAL |
 | Front / motor0 | RPWM | `PA8` | Orange | FINAL |
 | Front / motor0 | LPWM | `PA9` | Yellow | FINAL |
-| Front / motor0 | R_EN | `PB0` | Green | FINAL |
-| Front / motor0 | L_EN | `PB1` | Blue | FINAL |
+| Front / motor0 | `R_EN` + `L_EN`, tied together | `PB0` | Green | FINAL common enable |
 | Center / motor1 | Encoder A | `PB4` | Brown | FINAL |
 | Center / motor1 | Encoder B | `PB5` | Pink | FINAL |
 | Center / motor1 | RPWM | `PA10` | Orange | FINAL |
 | Center / motor1 | LPWM | `PB8` (`TIM16_CH1`) | Yellow | PLANNED CubeMX |
-| Center / motor1 | R_EN | `PA4` | Green | PLANNED CubeMX |
-| Center / motor1 | L_EN | `PA5` | Blue | PLANNED CubeMX |
+| Center / motor1 | `R_EN` + `L_EN`, tied together | `PB9` | Green | FINAL common enable |
 | Rear / motor2 | Encoder A | `PB6` | Brown | FINAL |
 | Rear / motor2 | Encoder B | `PB7` | Pink | FINAL |
 | Rear / motor2 | RPWM | `PB14` | Orange | FINAL |
 | Rear / motor2 | LPWM | `PB15` | Yellow | FINAL |
-| Rear / motor2 | R_EN | `PB10` | Green | FINAL |
-| Rear / motor2 | L_EN | `PB11` | Blue | FINAL |
+| Rear / motor2 | `R_EN` + `L_EN`, tied together | `PB10` | Green | FINAL common enable |
 
 For every encoder also run its rated supply as red with a voltage label and
 ground as black. Confirm whether the encoder outputs are safe at STM32 3.3 V
 before connection. The same signal colors repeat only inside each separately
 labeled front/center/rear connector.
 
-### Local CD74HC4067 on each STM32
+Connect both enable inputs of each driver to its single common-enable GPIO.
+Add one 10 kohm pull-down from each common-enable net to GND so all drivers
+stay disabled while the STM32 is resetting or unpowered. Do not join enable
+nets between different motors.
 
-| MUX channel | Source | Color at driver/sensor connector |
-| ---: | --- | --- |
-| `C0` | Front `R_IS` | White |
-| `C1` | Front `L_IS` | Gray |
-| `C2` | Center `R_IS` | White |
-| `C3` | Center `L_IS` | Gray |
-| `C4` | Rear `R_IS` | White |
-| `C5` | Rear `L_IS` | Gray |
-| `C6-C15` | Reserved; leave unconnected | No wire |
+### Direct current-sense ADC wiring
 
-MUX `VCC` goes to STM32 `3V3` with a red wire labelled `3V3`; MUX `GND` and
-`EN` go to ground with black wires so the chip is always enabled. Place a
-100 nF decoupling capacitor directly between MUX VCC and GND.
+| Motor | Driver signal | STM32 pin / ADC channel | Color | Status |
+| --- | --- | --- | --- | --- |
+| Front / motor0 | `R_IS` | `PA6 / ADC2_IN3` | White | FINAL |
+| Front / motor0 | `L_IS` | `PA7 / ADC2_IN4` | Gray | FINAL |
+| Center / motor1 | `R_IS` | `PA4 / ADC2_IN17` | White | FINAL |
+| Center / motor1 | `L_IS` | `PA5 / ADC2_IN13` | Gray | FINAL |
+| Rear / motor2 | `R_IS` | `PB2 / ADC2_IN12` | White | FINAL |
+| Rear / motor2 | `L_IS` | `PB12 / ADC1_IN11` | Gray | FINAL |
 
-Only `C0-C5` are populated in the current build. Every R_IS/L_IS signal must
-be conditioned so its complete voltage range stays within `0-3.3 V`. Add
-dividers, buffers, and input protection as required by the final motor driver;
-the multiplexer itself does not make a 5 V signal safe for the STM32 ADC.
+There is no CD74HC4067 in the final harness. Every R_IS/L_IS signal connects
+to its own ADC pin and must be conditioned so its complete voltage range stays
+within `0-3.3 V`. Add the divider/buffer, RC filtering, and input protection
+required by the selected motor-driver module. Never connect an unverified 5 V
+sense output directly to the STM32.
 
-### CD74HC4067 control and ADC wiring
-
-| CD74HC4067 | STM32 pin | Color | Status / note |
-| --- | --- | --- | --- |
-| `SIG` | `PA6 / ADC2_IN3` | White | PLANNED CubeMX; single-ended ADC input |
-| `S0` | `PA7` | Blue | PLANNED CubeMX; GPIO output, initial low |
-| `S1` | `PB2` | Green | PLANNED CubeMX; GPIO output, initial low |
-| `S2` | `PB12` | Yellow | PLANNED CubeMX; GPIO output, initial low |
-| `S3` | `PB13` | Violet | PLANNED CubeMX; GPIO output, initial low |
-| `EN` | `GND` | Black | Always enabled |
-| `VCC` | `3V3` | Red, label `3V3` | 100 nF local decoupling |
-| `GND` | `GND` | Black | Same analog reference as STM32 |
-
-The generated `main.h` currently contains legacy direct-ADC labels. They are
-not the final harness. Enable `UGV_MUX_GPIO_CONFIGURED` only after CubeMX has
-generated `MUX_SIG` and `MUX_S0` through `MUX_S3` exactly as above.
+`PB1`, `PB11`, and `PB13` are free GPIO reserve after this change.
 
 ### STM32 SN65HVD230 CAN transceiver
 

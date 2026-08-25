@@ -158,7 +158,7 @@ CRC before jumping.
 
 ## Bench acceptance checklist
 
-- Motor supply disconnected; all six R_EN/L_EN lines measure low during reset
+- Motor supply disconnected; all three common-enable nets measure low during reset
   and while the bootloader waits.
 - Power-off CAN-H to CAN-L resistance is approximately 60 ohm with exactly two
   120 ohm end terminators.
