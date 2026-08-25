@@ -11,10 +11,10 @@
           full-duplex CRSF, 420000 baud
                      |
                      v
-            ESP32-S3 control/AUX node <-------- CAN -------- Raspberry Pi 5
-            - MANUAL/AUTO arbiter                            - camera/audio
-            - final motion authority                         - navigation
-            - OLED, IMU, GPS, light sensor                   - autonomy request
+            ESP32-S3 control/AUX node <------ Wi-Fi/IP ------ Raspberry Pi 5
+            - MANUAL/AUTO arbiter                            - IMX708 camera/audio
+            - final motion authority                         - video streaming
+            - OLED, IMU, GPS, light sensor                   - future navigation
             - lights and warning buzzer                      - logging/network
                      |
           final Classic CAN commands, 500 kbit/s
@@ -29,19 +29,28 @@
         local safety     local safety
              |               |
         CD74HC4067       CD74HC4067
+
+ Raspberry Pi 5 ------ Wi-Fi video ------> operator phone/laptop
 ```
 
-Every CAN node has its own external transceiver. The two STM32 nodes close
-their own speed-control and safety loops. The ESP32 chooses the active command
-source but never performs motor PID control.
+The runtime CAN trunk has exactly three nodes: ESP32, STM32 Left, and STM32
+Right. Each uses its own SN65HVD230 transceiver. Raspberry Pi has no CAN
+transceiver and no CAN wiring. The two STM32 nodes close their own speed-control
+and safety loops. The ESP32 chooses the active command source but never
+performs motor PID control.
+
+Manual control is independent of Raspberry Pi and Wi-Fi. If either fails, the
+ELRS/XR4 to ESP32 to CAN path remains operational; only video, Pi logging, and
+future Pi autonomy are lost.
 
 ## STM32 boot and update path
 
 Each STM32 has a role-specific custom bootloader at `0x08000000` and an OTA
-application at `0x08006000`. Raspberry Pi sends the update over the same
-500 kbit/s CAN trunk. The running motor application accepts `ENTER` only from
-a safe disabled/fault/estop state, disables all motor outputs, and resets into
-the bootloader.
+application at `0x08006000`. During maintenance, an external Linux service
+computer and USB-CAN adapter temporarily connect to the 500 kbit/s CAN trunk.
+The running motor application accepts `ENTER` only from a safe
+disabled/fault/estop state, disables all motor outputs, and resets into the
+bootloader.
 
 The bootloader invalidates application metadata before erasing any application
 page. It writes sequenced six-byte CAN chunks, verifies the complete image
@@ -59,16 +68,16 @@ needed for normal application updates. See
 ## Control authority
 
 Only the ESP32 may publish the final `VehicleMotion` (`0x100`) and
-`SystemEnable` (`0x110`) frames consumed by the motor nodes. Raspberry Pi uses
-the separate `AutoMotionRequest` (`0x101`) and `AutoEnableRequest` (`0x111`)
-frames. This keeps normal software from producing two competing command
-streams with the same CAN identifiers.
+`SystemEnable` (`0x110`) frames consumed by the motor nodes. A future Raspberry
+Pi autonomy service sends requests to ESP32 over an authenticated Wi-Fi/IP
+protocol, never directly to CAN. This keeps Raspberry Pi outside the critical
+motor bus and prevents competing final command producers.
 
 | Selected mode | Accepted source | Failure behavior |
 | --- | --- | --- |
 | `DISABLED` | None | Final targets are zero and motor enable is false |
 | `MANUAL` | Valid XR4 CRSF link | RC loss/failsafe stops and disables the vehicle |
-| `AUTO` | Fresh Raspberry Pi request | Stale Pi request stops and disables the vehicle |
+| `AUTO` | Fresh Raspberry Pi Wi-Fi request | Stale network request stops and disables the vehicle |
 
 The operator selects the mode explicitly. Failure of the selected source must
 not cause an automatic change to another source; for example, loss of the Pi
@@ -79,7 +88,7 @@ in AUTO never activates a non-neutral RC stick unexpectedly.
 ```text
 XR4 frame age/CRSF failsafe       100 ms
               |
-Pi AUTO request age               300 ms
+Pi Wi-Fi AUTO request age         300 ms
               |
 ESP32 final command period        10-20 ms
               |
@@ -102,9 +111,10 @@ software execution.
   disable.
 - ESP32 owns XR4/CRSF input, MANUAL/AUTO arbitration, final vehicle commands,
   the local display/control panel, IMU, light sensor, GPS, lighting outputs,
-  and warning buzzer.
+  warning buzzer, and the future Wi-Fi command/telemetry gateway.
 - Raspberry Pi owns the IMX708 camera, full speaker/audio path, navigation,
-  autonomy requests, remote connectivity, telemetry storage, and logging.
+  video streaming, future Wi-Fi autonomy requests, telemetry storage, and
+  logging. It never publishes or receives CAN frames directly.
 
 ## Source ownership
 
@@ -115,9 +125,10 @@ motor control, safety, and platform adapters. `firmware/stm32-left` and
 `firmware/esp32` is an independent ESP-IDF project. It does not include or
 modify the older `blinkESP32` repository.
 
-`shared/can` is platform-neutral and is consumed by STM32, ESP32, Raspberry Pi
-software, and host tests. C structures are never copied directly to CAN data;
-the codec defines byte order and payload length explicitly.
+`shared/can` is platform-neutral and is consumed by STM32, ESP32, service
+tools, and host tests. Raspberry Pi uses a separate Wi-Fi/IP contract with
+ESP32. C structures are never copied directly to CAN data; the codec defines
+byte order and payload length explicitly.
 
 ## RF and GPS placement
 
@@ -130,13 +141,14 @@ reported GPS interference when RF and GNSS hardware are placed close together.
 ## Current implementation boundary
 
 The CAN update protocol, STM32 bootloader, flash validation/recovery logic,
-application-to-bootloader handoff, and Raspberry Pi SocketCAN uploader are
+application-to-bootloader handoff, and Linux SocketCAN service uploader are
 implemented and host-tested, but not yet validated on assembled hardware. The
 checked-in CubeMX project still has the legacy pinout; its manual FDCAN/TIM16/
 MUX migration is documented separately.
 
 The application-side FDCAN code currently owns only the update-entry filter.
 The normal STM32 motion-command and telemetry dispatcher, ESP32 CRSF parsing,
-ESP32 arbitration, and ESP32 TWAI transport remain separate milestones. Until
-those transports are finished and hardware-tested, USART2 remains the motor
-node bench command interface.
+ESP32 arbitration/TWAI transport, Pi camera streaming, and the future ESP32-to-
+Pi Wi-Fi protocol remain separate milestones. Until those transports are
+finished and hardware-tested, USART2 remains the motor-node bench command
+interface.

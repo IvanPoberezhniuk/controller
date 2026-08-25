@@ -11,10 +11,13 @@ Raspberry Pi 5 as the high-level computer.
 | STM32 Left | Front-left, center-left, rear-left motors; encoders; six R_IS/L_IS signals; three motor temperatures |
 | STM32 Right | Front-right, center-right, rear-right motors; encoders; six R_IS/L_IS signals; three motor temperatures |
 | ESP32 control/AUX | XR4 CRSF receiver, MANUAL/AUTO arbitration, final CAN commands, OLED, encoder UI, IMU, ambient light, GPS, lighting, buzzer |
-| Raspberry Pi 5 | Camera, full audio, navigation, autonomous command requests, networking and logging |
+| Raspberry Pi 5 | Wi-Fi camera/video, full audio, navigation, networking and logging; no direct CAN connection |
 
 Each STM32 owns one CD74HC4067. Both STM32 targets compile the same motor
 firmware and select only their role-specific configuration at build time.
+The runtime CAN trunk contains only ESP32 and the two STM32 nodes. Raspberry Pi
+communicates over Wi-Fi/IP and is not part of the manual-control or motor-safety
+path.
 
 ## Repository layout
 
@@ -67,8 +70,8 @@ Build both role-specific bootloaders and applications:
 
 After applying the documented final CubeMX FDCAN/TIM16 pin migration, use
 `-FinalPinout`. A blank STM32 receives its matching custom bootloader once over
-USART2 using the factory ROM bootloader. Raspberry Pi then uploads every
-application image through SocketCAN:
+USART2 using the factory ROM bootloader. An external Linux service computer
+with USB-CAN can then upload application images through SocketCAN:
 
 ```bash
 python3 tools/ugv_can_update.py --interface can0 --node left \
@@ -108,7 +111,7 @@ Peripheral drivers are added independently after hardware validation.
 
 The STM32 motor firmware is still at motor-node bring-up stage. The custom
 FDCAN bootloader, power-loss-safe flash state machine, application handoff, and
-Raspberry Pi updater are implemented and host-tested. FDCAN is not yet enabled
+Linux SocketCAN updater are implemented and host-tested. FDCAN is not yet enabled
 in the checked-in CubeMX application project. The CD74HC4067 sampling code and
 logical channel map are ready, but sensing remains a safe no-op until the
 documented GPIO/ADC assignment is added manually and

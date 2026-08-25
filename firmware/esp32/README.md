@@ -10,9 +10,13 @@ Responsibilities:
 - RadioMaster XR4 receiver over full-duplex CRSF at 420000 baud;
 - SH1106 128x64 OLED and rotary encoder UI;
 - IMU, ambient-light sensor, and GPS;
-- vehicle lighting and a local warning buzzer.
+- vehicle lighting and a local warning buzzer;
+- future Wi-Fi/IP link to Raspberry Pi for autonomy requests and relayed
+  telemetry.
 
-Full audio and the camera remain Raspberry Pi responsibilities.
+Full audio and the camera remain Raspberry Pi responsibilities. Raspberry Pi
+is deliberately absent from the CAN trunk: ESP32 is the only runtime gateway
+between non-motor command sources and the STM32 motor nodes.
 
 Build from an initialized ESP-IDF shell:
 
