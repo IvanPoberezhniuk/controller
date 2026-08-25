@@ -37,7 +37,7 @@ typedef struct {
     uint32_t encoder_counts_per_output_rev; /* measured output-shaft quadrature counts/rev */
     uint32_t command_timeout_ms;
     uint32_t stall_min_duration_ms;
-    float    stall_current_threshold_a;     /* provisional until MUX/current calibration */
+    float    stall_current_threshold_a;     /* provisional until direct-ADC calibration */
     float    current_sense_scale_a_per_v;   /* TODO: calibrate against the actual R_IS/L_IS
                                               * sense resistor value once the BTS7960 board
                                               * is populated */

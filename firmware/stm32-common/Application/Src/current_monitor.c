@@ -75,7 +75,7 @@ void current_monitor_sample(void)
 {
     uint32_t adc2_raw[ADC2_DIRECT_CHANNEL_COUNT] = {0u};
     uint32_t adc1_raw[ADC1_DIRECT_CHANNEL_COUNT] = {0u};
-    bool valid = s_adc_ready &&
+    bool valid = (UGV_CURRENT_SENSE_CALIBRATED != 0) && s_adc_ready &&
         adc_read_scan(&hadc2, adc2_raw, ADC2_DIRECT_CHANNEL_COUNT) &&
         adc_read_scan(&hadc1, adc1_raw, ADC1_DIRECT_CHANNEL_COUNT);
 
