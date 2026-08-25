@@ -17,13 +17,14 @@ Do not power the motor harness until that regeneration is complete.
                                                |
                                                v
                                          ESP32-S3
-                                         CAN transceiver
+                                         SN65HVD230
                                                |
- CAN end A -- Raspberry Pi -- STM32 Left -- ESP32 -- STM32 Right -- CAN end B
-               transceiver     transceiver              transceiver
-                                               |
-                                  exactly two 120 ohm terminators:
-                                  one at end A, one at end B
+ CAN end A [120R] -- STM32 Left -- ESP32 -- STM32 Right -- [120R] CAN end B
+                         SN65HVD230 at every node
+
+ IMX708 camera --> Raspberry Pi 5 )))) Wi-Fi video )))) operator device
+                         )))) optional Wi-Fi/IP )))) ESP32
+                         no connection to CAN-H/CAN-L
 ```
 
 The diagram shows logical order only. Put the terminators on the two physical
@@ -73,19 +74,22 @@ from the GPS antenna, then test GPS fix quality while Gem-X is transmitting.
 Target board: Sixspan ESP32-S3-N16R8. GPIO39-GPIO42 remain free after all
 assignments below.
 
-### CAN transceiver
+### SN65HVD230 CAN transceiver
 
 | From | To | Color | Status / note |
 | --- | --- | --- | --- |
-| ESP32 `GPIO17` (`TWAI_TX`) | Transceiver `TXD` | Orange | FINAL; logic-side signal |
-| Transceiver `RXD` | ESP32 `GPIO18` (`TWAI_RX`) | White | FINAL; logic-side signal |
-| ESP32 `3V3` | Transceiver `VCC/VIO` | Red, label `3V3` | Use a 3.3 V-compatible transceiver |
+| ESP32 `GPIO17` (`TWAI_TX`) | SN65HVD230 `D/TXD` | Orange | FINAL; add 10 kohm pull-up to 3V3 |
+| SN65HVD230 `R/RXD` | ESP32 `GPIO18` (`TWAI_RX`) | White | FINAL; logic-side signal |
+| ESP32 `3V3` | SN65HVD230 `VCC` | Red, label `3V3` | Never power this part from 5 V |
 | ESP32 `GND` | Transceiver `GND` | Black | Common signal reference |
 | Transceiver `CANH` | CAN-H trunk | Yellow | Twisted pair |
 | Transceiver `CANL` | CAN-L trunk | Green | Twisted pair |
+| SN65HVD230 `RS` | `GND` | Black | High-speed mode; often handled on modules |
+| SN65HVD230 `Vref` | Not connected | No wire | Leave floating when unused |
 
-The transceiver and its required decoupling/ESD parts belong close to the
-ESP32. ESP32 GPIOs must never connect directly to CAN-H/CAN-L.
+Place 100 nF directly across transceiver VCC/GND and a CAN TVS such as
+SM24CANB close to the bus connector. ESP32 GPIOs must never connect directly
+to CAN-H/CAN-L.
 
 ### SH1106 OLED
 
@@ -233,20 +237,23 @@ The generated `main.h` currently contains legacy direct-ADC labels. They are
 not the final harness. Enable `UGV_MUX_GPIO_CONFIGURED` only after CubeMX has
 generated `MUX_SIG` and `MUX_S0` through `MUX_S3` exactly as above.
 
-### STM32 CAN transceiver
+### STM32 SN65HVD230 CAN transceiver
 
 | From | To | Color | Status / note |
 | --- | --- | --- | --- |
-| STM32 `PA12 / FDCAN1_TX` | Transceiver `TXD` | Orange | PLANNED CubeMX |
-| Transceiver `RXD` | STM32 `PA11 / FDCAN1_RX` | White | PLANNED CubeMX |
-| STM32 `3V3` | Transceiver `VCC/VIO` | Red, label `3V3` | Use 3.3 V-compatible logic |
+| STM32 `PA12 / FDCAN1_TX` | SN65HVD230 `D/TXD` | Orange | PLANNED CubeMX; 10 kohm pull-up to 3V3 |
+| SN65HVD230 `R/RXD` | STM32 `PA11 / FDCAN1_RX` | White | PLANNED CubeMX |
+| STM32 `3V3` | SN65HVD230 `VCC` | Red, label `3V3` | Never connect to 5 V |
 | STM32 `GND` | Transceiver `GND` | Black | Common signal reference |
 | Transceiver `CANH` | CAN-H trunk | Yellow | Twisted with CAN-L |
 | Transceiver `CANL` | CAN-L trunk | Green | Twisted with CAN-H |
+| SN65HVD230 `RS` | `GND` | Black | High-speed mode; often handled on modules |
+| SN65HVD230 `Vref` | Not connected | No wire | Leave floating when unused |
 
 PA11/PA12 connect only to the transceiver logic pins, never directly to
-CAN-H/CAN-L. The bootloader already configures these pins; the application
-starts using them after the manual CubeMX migration.
+CAN-H/CAN-L. Place 100 nF at VCC/GND and SM24CANB at the bus connector. The
+bootloader already configures these pins; the application starts using them
+after the manual CubeMX migration.
 
 ### STM32 service connections
 
@@ -264,6 +271,20 @@ PB8 is both BOOT0 and the final center `LPWM`. Never fit the BOOT0 jumper while
 motor power is connected. For first programming without ST-Link, follow
 [`firmware-update.md`](firmware-update.md).
 
+## Raspberry Pi Wi-Fi camera node
+
+| Connection | Destination | Note |
+| --- | --- | --- |
+| IMX708 CSI ribbon | Raspberry Pi camera connector | Camera/video source |
+| Regulated Pi 5 V supply | Raspberry Pi power input | Dedicated fused branch sized for Pi and camera |
+| Wi-Fi | Operator access point/device | Video, logging and future IP control |
+| Optional Wi-Fi/IP | ESP32 | Future autonomy requests and relayed telemetry |
+| CAN-H / CAN-L | No connection | Raspberry Pi is not a runtime CAN node |
+
+Do not run camera data through ESP32. Raspberry Pi encodes and streams video
+directly over Wi-Fi. A Pi or Wi-Fi failure must not affect the XR4 to ESP32 to
+STM32 manual-control path.
+
 ## CAN trunk
 
 | Bus conductor | Color | Wiring rule |
@@ -278,9 +299,10 @@ CAN-H and CAN-L, one at each physical end. With power off, a resistance check
 between CAN-H and CAN-L should be approximately 60 ohms when both terminators
 are installed.
 
-Raspberry Pi, both STM32 boards, and ESP32 each need their own transceiver.
-The Raspberry Pi CAN HAT/adapter model and its GPIO/SPI mapping are not yet
-final, so that connector remains TBD rather than assigning imaginary Pi pins.
+Only STM32 Left, ESP32, and STM32 Right are permanent CAN nodes, each with one
+SN65HVD230. If that is also their physical order, enable 120 ohm termination at
+Left and Right only. Raspberry Pi has no permanent CAN transceiver. A USB-CAN
+adapter may be attached temporarily during firmware service.
 
 ## Power and grounding rules
 
