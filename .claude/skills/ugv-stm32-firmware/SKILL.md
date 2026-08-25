@@ -10,9 +10,9 @@ description: TRIGGER when discussing STM32G431 hardware/peripherals, node or pin
 Each STM32 node performs: motor PWM generation, direction control, driver
 enable control, encoder counting, wheel-speed calculation, per-wheel PID
 control, acceleration/deceleration ramping, command-timeout detection,
-emergency-stop response, watchdog handling, current-sensor acquisition (when
-added), local fault detection, CAN communication, local telemetry publication,
-and deterministic safe-state entry.
+emergency-stop response, watchdog handling, direct R_IS/L_IS acquisition,
+local fault detection, CAN communication, local telemetry publication, and
+deterministic safe-state entry.
 
 A motor-control STM32 must be able to stop its motors safely even if the
 ESP32 crashes, CAN stops, the operator connection is lost, Raspberry Pi/Linux
@@ -70,13 +70,18 @@ TIM2 encoder mode — front motor
 TIM3 encoder mode — center motor
 TIM4 encoder mode — rear motor
 
-TIM1 PWM channels — selected motor PWM outputs
-TIM8 PWM channels — additional PWM outputs or synchronized motor control
+TIM1 CH1/CH2 — front RPWM/LPWM
+TIM1 CH3 + TIM16 CH1 — center RPWM/LPWM
+TIM15 CH1/CH2 — rear RPWM/LPWM
+
+PB0/PB9/PB10 — front/center/rear common driver enables
 
 FDCAN1 — vehicle CAN bus
 
-ADC + DMA:
-- driver current measurements when added;
+ADC, software-triggered/polled initially:
+- ADC2 five-rank scan: PA6, PA7, PB2, PA5, PA4;
+- ADC1 single channel: PB12;
+- six direct R_IS/L_IS current measurements total;
 - controller supply voltage;
 - optional board temperature.
 

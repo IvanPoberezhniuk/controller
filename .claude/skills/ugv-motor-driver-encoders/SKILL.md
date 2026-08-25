@@ -44,6 +44,11 @@ cannot produce shoot-through. During reset: outputs must default to motor
 disabled, hardware pull-down/pull-up resistors must establish the safe state,
 driver enable must stay inactive until firmware init finishes.
 
+For the current dual-enable modules, tie each driver's R_EN and L_EN inputs to
+one per-motor STM32 GPIO with a 10 kohm pull-down. Keep front, center, and rear
+enable nets independent. Connect all six R_IS/L_IS outputs directly to the
+documented ADC pins; no external analog multiplexer is used.
+
 ### Braking
 
 Support configurable coast, active brake, controlled deceleration. **Do not

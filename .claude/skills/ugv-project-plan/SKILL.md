@@ -116,6 +116,7 @@ Do not return to these without a documented reason:
 - YS-60A RC ESC as the main motor-control solution;
 - treating STM32F411 as if it contains native CAN;
 - placing all six motors on one G431 solely to reduce board count;
+- using CD74HC4067 multiplexers for only six R_IS/L_IS signals per STM32;
 - relying on Raspberry Pi Linux for real-time wheel PID and failsafe;
 - placing Raspberry Pi permanently on the CAN trunk instead of using Wi-Fi/IP;
 - sending HD video through ELRS;

@@ -46,7 +46,7 @@ Radio + Nomad -> XR4 --CRSF--> ESP32-S3 control/AUX <--Wi-Fi/IP--> Raspberry Pi 
                STM32G431CBT6 left          STM32G431CBT6 right
                3 encoders / PID loops      3 encoders / PID loops
                3 motor drivers             3 motor drivers
-               CD74HC4067                   CD74HC4067
+               6 direct ADC inputs          6 direct ADC inputs
                local failsafe              local failsafe
                            |                           |
                            v                           v
@@ -117,7 +117,7 @@ Immediate implementation priority:
 Validate one motor and encoder
 -> select final H-bridge
 -> control one motor using STM32G431CBT6
--> expand to three motors and local CD74HC4067 sensing
+-> expand to three motors and direct R_IS/L_IS sensing
 -> add CAN
 -> validate separate left/right builds from the shared node firmware
 -> bring up the ESP32 AUX node

@@ -91,11 +91,14 @@ during motor startup or braking.**
 
 ## Current and voltage sensing
 
-No final current-sensor hardware confirmed. Required measurements: total
-battery voltage, total battery current, preferably individual driver/motor
-current, Pi supply voltage, motor-controller supply voltage. Used for: energy
-consumption, stall detection, traction diagnostics, driver selection, fuse
-validation, 2WD/4WD/6WD comparison, estimated battery runtime.
+The STM32 interface for individual motor-driver current is fixed: six direct
+R_IS/L_IS ADC inputs per board, with no external analog multiplexer. The final
+driver output behavior, 0-3.3 V conditioning network, filtering, and
+amperes-per-volt calibration remain unresolved. Other required measurements:
+total battery voltage, total battery current, Pi supply voltage, and
+motor-controller supply voltage. Used for energy consumption, stall detection,
+traction diagnostics, driver selection, fuse validation, 2WD/4WD/6WD
+comparison, and estimated battery runtime.
 
 ## Temperature monitoring
 
