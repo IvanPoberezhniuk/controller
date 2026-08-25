@@ -2,8 +2,9 @@
 
 This is the manual CubeMX checklist for the shared STM32G431CBT6 motor-node
 project. Left and Right use the same `.ioc`; role-specific behavior is selected
-by the CMake preset. The checked-in `.ioc` still contains the legacy direct-ADC
-and pre-CAN pinout and is intentionally not modified by the OTA implementation.
+by the CMake preset. The checked-in `.ioc` already contains the six direct-ADC
+inputs but still has the pre-CAN PWM/enable labels. It remains intentionally
+unchanged so the user can perform and review the final CubeMX regeneration.
 
 ## Required final pin migration
 
@@ -15,27 +16,29 @@ partial migration creates pin conflicts or drives the center motor incorrectly.
 2. Enable TIM16, internal clock, PWM Generation CH1 on PB8. Set Prescaler `0`,
    Counter Period `8499`, Pulse `0`, PWM mode 1, active-high. Label it
    `MOTOR1_LPWM`.
-3. Move center-driver enables to PA4=`MOTOR1_R_EN` and
-   PA5=`MOTOR1_L_EN`. Configure both as push-pull outputs, no pull, low speed,
-   initial output low. PB9 becomes free.
-4. Replace the legacy ADC scan with one ADC2 single-ended regular channel:
-   PA6=`ADC2_IN3`, label `MUX_SIG`, one conversion, software trigger,
-   non-continuous mode. Start with 92.5-cycle sampling time.
-5. Configure PA7=`MUX_S0`, PB2=`MUX_S1`, PB12=`MUX_S2`, and PB13=`MUX_S3`
-   as push-pull GPIO outputs, initial low.
-6. Disable ADC1 after removing its old PB12 direct current-sense channel.
-7. Enable FDCAN1 in Classic CAN normal mode on PA11=`FDCAN1_RX` and
+3. Use one common-enable output per motor: PB0=`MOTOR0_EN`, PB9=`MOTOR1_EN`,
+   PB10=`MOTOR2_EN`. Configure them push-pull, no pull, low speed, initial low.
+   Each output fans out to both R_EN and L_EN inputs of its own driver. Remove
+   the old PB1/PB11 enable outputs; PB8 changes to TIM16 in step 2.
+4. Keep all six direct current-sense inputs. ADC2 must be a five-rank,
+   single-ended scan: rank1 PA6/IN3 front R_IS, rank2 PA7/IN4 front L_IS,
+   rank3 PB2/IN12 rear R_IS, rank4 PA5/IN13 center L_IS, rank5 PA4/IN17 center
+   R_IS. ADC1 remains one channel: PB12/IN11 rear L_IS. Use software trigger,
+   non-continuous mode, EOC after each conversion, and start with 92.5-cycle
+   sampling time on every rank.
+5. Select SYSCLK as the ADC12 kernel clock and asynchronous divide-by-8 for
+   both ADCs: `170 MHz / 8 = 21.25 MHz` ADC clock.
+6. Enable FDCAN1 in Classic CAN normal mode on PA11=`FDCAN1_RX` and
    PA12=`FDCAN1_TX`, using the exact timing in the FDCAN section below.
-8. Set the standard-filter count to at least `1`, RX FIFO0 to at least one
+7. Set the standard-filter count to at least `1`, RX FIFO0 to at least one
    8-byte element, and TX FIFO/queue to at least one 8-byte element. The
    temporary application update service uses standard filter index 0.
-9. Generate code with **Keep User Code when re-generating** enabled. Confirm
+8. Generate code with **Keep User Code when re-generating** enabled. Confirm
    `MX_TIM16_Init()` and `MX_FDCAN1_Init()` are called before
    `app_main_init()`.
-10. Only after the generated code builds, change
-    `UGV_MUX_GPIO_CONFIGURED` to `1` in
-    `Application/Inc/node_common_config.h` and build OTA images with
-    `tools/build-update-images.ps1 -FinalPinout`.
+9. Build both OTA applications and bootloaders with
+   `tools/build-update-images.ps1 -FinalPinout`. No current-sensing feature
+   flag is required.
 
 The custom bootloader does not use this CubeMX initialization. It configures
 HSI16, PA11/PA12, FDCAN, flash, and safe output levels independently, so it
@@ -138,13 +141,10 @@ factory-provisioning session.
 | Prescaler | ÷4 | Divides the ~32 kHz LSI clock down to ~8 kHz for the watchdog counter. |
 | Reload / Window | 4095 / 4095 | Reload=4095 gives roughly a 512 ms timeout (`4096 / 8000 Hz`). Window=4095 (== Reload) disables window-mode early-refresh protection — simplest safe starting point; window mode can be added later if premature-refresh bugs become a concern. |
 
-## Legacy generated state: ADC2 direct current-sense channels
+## Direct current sensing: ADC2 scan
 
-The following section documents what is still present in `UGV_MotorNode.ioc`,
-not the final multiplexer architecture. Do not enable
-`UGV_MUX_GPIO_CONFIGURED` while ADC2 is configured as this five-rank scan.
-The final manual CubeMX edit will replace these pins with one `MUX_SIG` ADC
-input plus four S0-S3 GPIO outputs.
+This five-rank scan is the final architecture and is already represented in
+`UGV_MotorNode.ioc`. Preserve it while making the FDCAN/TIM16 changes.
 
 | Field | Value | Why |
 |---|---|---|
@@ -153,6 +153,7 @@ input plus four S0-S3 GPIO outputs.
 | Scan Conversion Mode | Enabled | Required to sample more than one channel per ADC — steps through all enabled channels in Rank order each time a conversion is triggered. |
 | Number Of Conversion | 5 | Must match the channel count exactly, or the scan sequence doesn't cover everything. |
 | Rank → Channel mapping | Rank1=CH3, Rank2=CH4, Rank3=CH12, Rank4=CH13, Rank5=CH17 | Each Rank needs its own explicit Channel assignment — CubeMX's generated code silently reused the *first* channel for every rank when this wasn't set per-rank, another real mistake caught by reading the generated `main.c` rather than trusting the GUI. |
+| Sampling time | 92.5 cycles initially | Provides acquisition margin for the final R_IS/L_IS conditioning network; reduce only after bench validation. The checked-in `.ioc` still has the earlier 2.5-cycle value, so update this manually before regeneration. |
 
 Firmware side (`firmware/stm32-common/Application/Src/current_monitor.c`): both ADCs are
 calibrated once at startup via `HAL_ADCEx_Calibration_Start()` before any
@@ -162,40 +163,33 @@ per rank) rather than DMA — simple and sufficient at this sample rate,
 though a DMA circular buffer would be the natural upgrade if the control
 loop rate increases later.
 
-**Clock note (after the 16 MHz → 170 MHz change):** `ClockPrescaler =
-ADC_CLOCK_SYNC_PCLK_DIV4` means the ADC's synchronous clock is now
-`170,000,000/4 = 42.5 MHz` (was 4 MHz before). This is believed to be
-within the STM32G4's synchronous ADC clock spec but has **not** been
-checked against the datasheet's ADC clock table yet — treat as
-unconfirmed until verified. Separately, real sample time in seconds
-shrinks proportionally at the same `ADC_SAMPLETIME_2CYCLES_5` setting —
-relevant when `current_sense_scale_a_per_v` (still a placeholder) is
-eventually calibrated against real hardware.
+**Clock note:** the current generated `main.c` selects SYSCLK for ADC12 and
+uses `ADC_CLOCK_ASYNC_DIV8`, producing `170/8 = 21.25 MHz`. Ensure CubeMX
+contains the same selection before regeneration; otherwise it can restore the
+older synchronous divide-by-4 setting. Validate ADC timing and the final
+R_IS/L_IS scale against the assembled conditioning network.
 
-## Legacy generated state: ADC1 remaining direct channel
+## Direct current sensing: ADC1 rear L_IS
 
-ADC1 becomes unnecessary for motor-current acquisition after the manual MUX
-pin assignment is complete.
+ADC1 remains enabled for the sixth direct current-sense signal.
 
 | Field | Value | Why |
 |---|---|---|
 | Channel | IN11 (PB12, motor2 L_IS) | The one current-sense pin that happened to only be reachable via ADC1, not ADC2, on this package — split across two ADC peripherals purely because of which physical pins map to which ADC instance in silicon, not by design choice. |
 | Single-ended | Single-ended | Same reasoning as ADC2. |
+| Sampling time | 92.5 cycles initially | Match the ADC2 current-sense ranks and validate on hardware. |
 
-## GPIO outputs — motor driver enables
+## GPIO outputs — common motor-driver enables
 
 | Pin | Label | Why this pin |
 |---|---|---|
-| PB0 | `MOTOR0_R_EN` | Free GPIO, avoided debug (PA13/PA14), oscillator (PC14/15), and SWO (PB3) pins. |
-| PB1 | `MOTOR0_L_EN` | Same reasoning, adjacent pin for a clean layout. |
-| PA4 | `MOTOR1_R_EN` | Final center R_EN; becomes free when the legacy ADC2_IN17 channel is removed. |
-| PA5 | `MOTOR1_L_EN` | Final center L_EN; becomes free when the legacy ADC2_IN13 channel is removed. |
-| PB10 | `MOTOR2_R_EN` (intended) | Free GPIO — but the CubeMX **User Label never actually got set** on this pin despite repeated attempts, so `main.h` has no macro for it. Firmware works around this directly (`firmware/stm32-common/Platform/Inc/board.h` defines `MOTOR2_R_EN_REAL_Pin`/`_GPIO_Port` pointing at `GPIOB`/`GPIO_PIN_10` explicitly). Worth fixing properly next time the `.ioc` is regenerated: click PB10, re-enter the User Label. |
-| PB11 | `MOTOR2_L_EN` | Free GPIO. |
+| PB0 | `MOTOR0_EN` | Drives front-driver R_EN and L_EN together. |
+| PB9 | `MOTOR1_EN` | Drives center-driver R_EN and L_EN together; PB8 is center LPWM. |
+| PB10 | `MOTOR2_EN` | Drives rear-driver R_EN and L_EN together. |
 
-Each motor's R_EN/L_EN are separate GPIOs (not tied together in software)
-rather than one shared enable pin, so a stalled/faulted motor can be
-disabled independently without cutting power to the other two.
+PB1, PB11, and PB13 become free GPIO reserve. Each motor still has an
+independent enable output, so a faulted motor can be disabled without cutting
+power to the other two. Fit a 10 kohm pull-down on every common-enable net.
 
 ## Pins deliberately left alone
 
