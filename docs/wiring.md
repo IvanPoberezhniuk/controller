@@ -232,18 +232,21 @@ labeled front/center/rear connector.
 | `C3` | Center `L_IS` | Gray |
 | `C4` | Rear `R_IS` | White |
 | `C5` | Rear `L_IS` | Gray |
-| `C6` | Front motor temperature | Violet |
-| `C7` | Center motor temperature | Violet |
-| `C8` | Rear motor temperature | Violet |
+| `C6-C15` | Reserved; leave unconnected | No wire |
 
 MUX `VCC` goes to STM32 `3V3` with a red wire labelled `3V3`; MUX `GND` and
 `EN` go to ground with black wires so the chip is always enabled. Place a
 100 nF decoupling capacitor directly between MUX VCC and GND.
 
-Every analog source connected to `C0-C8` must be conditioned so its complete
-voltage range stays within `0-3.3 V`. Add dividers, buffers, and input
-protection as required by the final motor driver and temperature sensor; the
-multiplexer itself does not make a 5 V signal safe for the STM32 ADC.
+Only `C0-C5` are populated in the current build. Every R_IS/L_IS signal must
+be conditioned so its complete voltage range stays within `0-3.3 V`. Add
+dividers, buffers, and input protection as required by the final motor driver;
+the multiplexer itself does not make a 5 V signal safe for the STM32 ADC.
+
+The confirmed six-wire motor harness has motor power +/-, encoder power +/-,
+and encoder A/B only. Its stated `-40...120 C` value is an operating range,
+not a temperature-sensor output. Do not install a motor-temperature harness
+or connect anything to `C6-C15` in this build.
 
 ### CD74HC4067 control and ADC wiring
 

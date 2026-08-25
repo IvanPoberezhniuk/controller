@@ -12,10 +12,10 @@ Logical motors:
 | motor1 / center | Center-right |
 | motor2 / rear | Rear-right |
 
-The local CD74HC4067 maps R_IS/L_IS for the three motors to channels 0-5 and
-the three motor-temperature inputs to channels 6-8. Motor and encoder signs
-remain neutral defaults until verified on the assembled right drivetrain. The
-final planned control pins are PA6=`MUX_SIG`, PA7=`S0`, PB2=`S1`, PB12=`S2`,
+The local CD74HC4067 maps R_IS/L_IS for the three motors to channels 0-5;
+channels 6-15 remain unconnected reserve. Motor and encoder signs remain
+neutral defaults until verified on the assembled right drivetrain. The final
+planned control pins are PA6=`MUX_SIG`, PA7=`S0`, PB2=`S1`, PB12=`S2`,
 PB13=`S3`. FDCAN uses PA11=RX and PA12=TX; center LPWM moves to PB8/TIM16_CH1
 and center enables move to PA4/PA5. These assignments still require the manual
 CubeMX regeneration.

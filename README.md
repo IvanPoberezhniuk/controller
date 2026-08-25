@@ -8,8 +8,8 @@ Raspberry Pi 5 as the high-level computer.
 
 | Node | Responsibilities |
 | --- | --- |
-| STM32 Left | Front-left, center-left, rear-left motors; encoders; six R_IS/L_IS signals; three motor temperatures |
-| STM32 Right | Front-right, center-right, rear-right motors; encoders; six R_IS/L_IS signals; three motor temperatures |
+| STM32 Left | Front-left, center-left, rear-left motors; encoders; six R_IS/L_IS signals |
+| STM32 Right | Front-right, center-right, rear-right motors; encoders; six R_IS/L_IS signals |
 | ESP32 control/AUX | XR4 CRSF receiver, MANUAL/AUTO arbitration, final CAN commands, OLED, encoder UI, QMI8658A IMU, M100-5883 GPS/compass, ambient light, lighting, buzzer |
 | Raspberry Pi 5 | Wi-Fi camera/video, full audio, navigation, networking and logging; no direct CAN connection |
 

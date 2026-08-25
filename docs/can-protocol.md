@@ -25,13 +25,19 @@ prevents its message table from drifting from the header.
 | 0x130 | 8 | Active mode, source and CRSF link status | ESP32 | Optional CAN service monitor |
 | 0x180 / 0x181 | 8 | Local three-wheel RPM telemetry | Left / Right STM32 | ESP32, optional service monitor |
 | 0x190 / 0x191 | 8 | Per-motor fault masks | Left / Right STM32 | ESP32, optional service monitor |
-| 0x1A0 / 0x1A1 | 8 | Temperatures with validity mask | Left / Right STM32 | ESP32, optional service monitor |
+| 0x1A0 / 0x1A1 | 8 | Reserved future temperatures with validity mask | Not produced | ESP32, optional service monitor |
 | 0x710 / 0x711 | 8 | Motor-node heartbeat | Left / Right STM32 | ESP32, optional service monitor |
 | 0x740 | 8 | Control/AUX-node heartbeat | ESP32 | Optional service monitor |
 
 Raspberry Pi is not a CAN node. Future autonomy commands arrive at ESP32 over
 Wi-Fi/IP, and ESP32 may relay selected CAN telemetry back to Pi over that same
 network link.
+
+No motor-temperature sensor is installed in the current build. IDs `0x1A0`
+and `0x1A1`, their codec, and their DBC definitions are retained to avoid an
+unnecessary protocol renumbering if external sensors are added later. Until
+then no node publishes these frames; any synthesized placeholder must use a
+zero validity mask and consumers must treat all three values as unavailable.
 
 The following identifiers remain in the checked-in header/DBC for compatibility
 but have no runtime producer in the Wi-Fi-only Pi architecture. Do not build

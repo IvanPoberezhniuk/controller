@@ -25,7 +25,7 @@
         STM32 Left       STM32 Right
         3 left motors    3 right motors
         encoders         encoders
-        current/temp     current/temp
+        current          current
         local safety     local safety
              |               |
         CD74HC4067       CD74HC4067
@@ -94,7 +94,7 @@ ESP32 final command period        10-20 ms
               |
 STM32 final command timeout       300 ms
               |
-local current/temperature/encoder checks
+local current/encoder/driver checks
               |
 motor-driver enable outputs
 ```
@@ -106,9 +106,8 @@ software execution.
 
 ## Responsibility boundaries
 
-- STM32 nodes own motor PWM/enables, quadrature encoders, local current and
-  temperature sampling, final-command timeout, target reset, and driver
-  disable.
+- STM32 nodes own motor PWM/enables, quadrature encoders, local current
+  sampling, final-command timeout, target reset, and driver disable.
 - ESP32 owns XR4/CRSF input, MANUAL/AUTO arbitration, final vehicle commands,
   the local display/control panel, QMI8658A IMU, M100-5883 GPS/compass,
   future light sensor, lighting outputs, warning buzzer, and the future Wi-Fi
@@ -153,3 +152,9 @@ ESP32 arbitration/TWAI transport, Pi camera streaming, and the future ESP32-to-
 Pi Wi-Fi protocol remain separate milestones. Until those transports are
 finished and hardware-tested, USART2 remains the motor-node bench command
 interface.
+
+Motor-temperature sensing is explicitly deferred. The confirmed motor cable
+does not expose a temperature signal, so MUX channels 6-15 remain unconnected.
+Reserved temperature fields and CAN identifiers stay in the protocol for a
+future external-sensor revision, but they must not be used for safety decisions
+unless their validity bits are set by implemented and tested hardware.
