@@ -169,11 +169,10 @@ though a DMA circular buffer would be the natural upgrade if the control
 loop rate increases later.
 
 **Clock note:** the `.ioc` selects SYSCLK for ADC12 and both ADCs use
-`ADC_CLOCK_ASYNC_DIV8`, producing `170/8 = 21.25 MHz`. CubeMX 6.18 records the
-kernel selection but does not emit the G431 RCC call, so the preserved
-`USER CODE BEGIN SysInit` block in `Core/Src/main.c` applies it before ADC
-initialization. Validate ADC timing and the final R_IS/L_IS scale against the
-assembled conditioning network.
+`ADC_CLOCK_ASYNC_DIV8`, producing `170/8 = 21.25 MHz`. The generated
+`HAL_ADC_MspInit()` applies `RCC_ADC12CLKSOURCE_SYSCLK` before enabling ADC1 or
+ADC2. Validate ADC timing and the final R_IS/L_IS scale against the assembled
+conditioning network.
 
 ## Direct current sensing: ADC1 rear L_IS
 
