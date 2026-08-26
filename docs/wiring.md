@@ -58,6 +58,14 @@ Use the XR4 primary CRSF pads, not the secondary UART.
 | XR4 `TX` | ESP32 `GPIO21` (`CRSF_RX`) | White | FINAL; UART signals cross |
 | XR4 `RX` | ESP32 `GPIO38` (`CRSF_TX`) | Orange | FINAL; carries telemetry to the radio |
 
+Keep the XR4 supply at a regulated `5.00 V`. Its specified `4.5-8.4 V` input
+range is an allowed operating range, not a telemetry-power adjustment. Raising
+the input toward 8.4 V does not increase the specified 100 mW telemetry output
+and only reduces transient margin and increases dissipation in the receiver's
+internal power circuitry. Fit 47-100 uF bulk capacitance plus 100 nF ceramic
+decoupling close to the XR4 `5V/GND` pads, and verify the voltage there while
+telemetry and receiver Wi-Fi are active.
+
 CRSF is configured as non-inverted, full-duplex UART at 420000 baud. RadioMaster
 does not state a guaranteed UART logic voltage in the published XR4 summary.
 Measure XR4 TX before direct connection: if its high level exceeds the ESP32
@@ -72,6 +80,51 @@ from the GPS antenna, then test GPS fix quality while Gem-X is transmitting.
 
 Target board: Sixspan ESP32-S3-N16R8. GPIO39-GPIO42 remain free after all
 assignments below.
+
+### Shared 3.3 V and central 5 V supplies
+
+Use one MP1584EN adjusted to `3.30 V` for every 3.3 V consumer in the control
+system. Use a second MP1584EN adjusted to `5.00 V` for XR4 and M100-5883.
+
+```text
+Protected DC logic branch
+          |
+          +--> MP1584EN #1: 3.30 V, 2 A / 6.6 W design allocation
+          |       +--> fused Central branch: ESP32 and central 3V3 peripherals
+          |       +--> fused Left branch: STM32, CAN, 3 encoders, 3 IBT-2 logic
+          |       `--> fused Right branch: STM32, CAN, 3 encoders, 3 IBT-2 logic
+          |
+          `--> MP1584EN #2: 5.00 V
+                  +--> XR4 receiver
+                  `--> M100-5883 GPS/compass
+```
+
+| MP1584EN terminal | Connection | Wire identification |
+| --- | --- | --- |
+| `IN+` | Fused/protected DC logic-branch positive | Red, label with input voltage |
+| `IN-` | Power-distribution ground | Black, label `GND` |
+| `OUT+` on #1 | Shared star-distributed `3V3` rail | Red, label `3V3` |
+| `OUT+` on #2 | Central `5V` rail | Red, label `5V` |
+| `OUT-` | Common logic ground | Black, label `GND` |
+
+The shared 3.3 V design allocation is `2 A / 6.6 W`, below the module's stated
+10 W ceiling but high enough that enclosure temperature and remote-node
+voltage drop must be tested. Run separate positive and ground conductors from
+the distribution point to Central, Left, and Right; do not daisy-chain node
+power. If the module overheats or either remote rail sags during motor or radio
+activity, replace the shared arrangement with local converters.
+
+The ESP32-S3 alone requires a supply designed for at least `500 mA`; the
+Central branch reserves `1 A`. Before direct connection, confirm that the exact
+Sixspan board permits its `3V3` pin to be used as a power input and isolate its
+onboard 3.3 V regulator output. Do not also feed the board through `5V/VIN` or
+powered USB. For programming, isolate USB VBUS or use a debugger that does not
+source target power.
+
+Both MP1584EN modules are step-down converters. Their inputs must remain within
+`4.5-28 V`, including battery-charge voltage and transients. Adjust each module
+with all output loads disconnected, power-cycle it, and verify `3.30 V` or
+`5.00 V` again before connecting electronics. Secure the trimmers after setup.
 
 ### SN65HVD230 CAN transceiver
 
@@ -193,30 +246,98 @@ Both STM32G431 nodes use the same MCU pin layout. `motor0` means front,
 `motor1` center, and `motor2` rear. The Left board connects those signals to
 the three left wheels; the Right board connects them to the three right wheels.
 
-### Encoder and final motor-driver pin plan
+### Shared 3.3 V branch at each STM32 node
 
-| Motor | Function | STM32 pin | Motor harness color | Status |
+Each motor node receives a separate branch from the shared 3.3 V star point.
+One node reserves `0.5 A / 1.65 W` for its STM32 board, SN65HVD230, three motor
+encoders, and three IBT-2 logic interfaces. Add local bulk decoupling at the
+node power entrance and 100 nF at each IC supply pair. Verify 3.3 V at the node
+while all three motors switch and while CAN traffic is active.
+
+### BTS7960/IBT-2 power domains
+
+Each driver needs motor power and logic power, but it does not need its own
+3.3 V converter.
+
+| IBT-2 connection | Supply/source | Rule |
+| --- | --- | --- |
+| Header `VCC` | Shared regulated `3V3` branch | Logic power only; applies to the pictured `AHC244D` module |
+| Header `GND` | Local logic ground | Common reference with STM32 and encoder ground |
+| Screw terminal `B+` | Protected motor-battery positive | High-current supply; individual driver fuse recommended |
+| Screw terminal `B-` | Motor-battery negative distribution | High-current return; never route through STM32 ground wiring |
+| Screw terminal `M+` | Motor red factory lead | H-bridge output, not a power input |
+| Screw terminal `M-` | Motor white factory lead | H-bridge output, not a power input |
+
+The six drivers may share the motor-battery distribution bus, but each driver
+should have its own correctly sized fuse for fault isolation. STM32 GPIOs drive
+only `RPWM`, `LPWM`, `R_EN`, and `L_EN`; they never supply driver power.
+
+### Factory motor and encoder leads
+
+The supplied GB37-520B motors have six factory-colored leads:
+
+| Factory lead | Function | Connection |
+| --- | --- | --- |
+| Red | Motor terminal + | That motor's BTS7960 `M+` output |
+| White | Motor terminal - | That motor's BTS7960 `M-` output |
+| Blue | Encoder supply + | Regulated `3V3` |
+| Black | Encoder supply - | STM32 signal `GND` |
+| Yellow | Encoder channel A | The motor's STM32 encoder-A input below |
+| Green | Encoder channel B | The motor's STM32 encoder-B input below |
+
+Red/white polarity defines the initial direction convention only; the H-bridge
+reverses the motor by reversing those terminals. Never connect either motor
+lead directly to the STM32. Power the encoder from 3.3 V so its output-high
+level remains safe for the STM32 inputs.
+
+The motor's blue encoder-supply wire and the pictured IBT-2 module's `VCC`
+pin are two separate loads connected to the shared regulated `3V3`
+rail. The motor's black encoder-ground wire, STM32 `GND`, and every IBT-2
+`GND` must join the same common logic-ground net. This 3.3 V IBT-2 logic supply
+applies to the pictured module fitted with an `AHC244D` buffer; verify that
+marking before connection because visually similar modules can differ.
+
+All six factory motor wires are accounted for above. The motor cable has no
+orange wire and does not need one.
+
+#### Factory encoder signals to STM32
+
+| Motor | Factory lead | Function | STM32 pin | Status |
 | --- | --- | --- | --- | --- |
-| Front / motor0 | Encoder A | `PA0` | Brown | FINAL |
-| Front / motor0 | Encoder B | `PA1` | Pink | FINAL |
-| Front / motor0 | RPWM | `PA8` | Orange | FINAL |
-| Front / motor0 | LPWM | `PA9` | Yellow | FINAL |
-| Front / motor0 | `R_EN` + `L_EN`, tied together | `PB0` | Green | FINAL common enable |
-| Center / motor1 | Encoder A | `PB4` | Brown | FINAL |
-| Center / motor1 | Encoder B | `PB5` | Pink | FINAL |
-| Center / motor1 | RPWM | `PA10` | Orange | FINAL |
-| Center / motor1 | LPWM | `PB8` (`TIM16_CH1`) | Yellow | FINAL |
-| Center / motor1 | `R_EN` + `L_EN`, tied together | `PB9` | Green | FINAL common enable |
-| Rear / motor2 | Encoder A | `PB6` | Brown | FINAL |
-| Rear / motor2 | Encoder B | `PB7` | Pink | FINAL |
-| Rear / motor2 | RPWM | `PB14` | Orange | FINAL |
-| Rear / motor2 | LPWM | `PB15` | Yellow | FINAL |
-| Rear / motor2 | `R_EN` + `L_EN`, tied together | `PB10` | Green | FINAL common enable |
+| Front / motor0 | Yellow | Encoder A | `PA0` | FINAL |
+| Front / motor0 | Green | Encoder B | `PA1` | FINAL |
+| Center / motor1 | Yellow | Encoder A | `PB4` | FINAL |
+| Center / motor1 | Green | Encoder B | `PB5` | FINAL |
+| Rear / motor2 | Yellow | Encoder A | `PB6` | FINAL |
+| Rear / motor2 | Green | Encoder B | `PB7` | FINAL |
 
-For every encoder also run its rated supply as red with a voltage label and
-ground as black. Confirm whether the encoder outputs are safe at STM32 3.3 V
-before connection. The same signal colors repeat only inside each separately
-labeled front/center/rear connector.
+Retain the factory colors and label both ends of every lead with its signal
+name. Before installing all six motors, verify one motor against its supplied
+encoder-wiring sheet and bench-test both encoder channels at 3.3 V. Stop if the
+observed pinout or output voltage differs from the table above.
+
+### STM32 to BTS7960 control wiring
+
+The wires below are separate Arduino/Dupont jumpers added between each STM32
+board and its three BTS7960 driver modules. They are not part of the motor's
+six-wire factory cable. The listed colors are only the chosen harness
+convention; another available color is electrically equivalent if both ends
+are labeled with the signal name.
+
+For each pictured `AHC244D`-equipped IBT-2 module, also connect STM32 `3V3` to
+the module header `VCC` and connect STM32 `GND` to module header `GND`.
+
+| Motor | From STM32 | To BTS7960 | Suggested added jumper | Status |
+| --- | --- | --- | --- | --- |
+| Front / motor0 | `PA8` | `RPWM` | Orange | FINAL |
+| Front / motor0 | `PA9` | `LPWM` | Yellow | FINAL |
+| Front / motor0 | `PB0` | `R_EN` + `L_EN`, tied together | Green | FINAL common enable |
+| Center / motor1 | `PA10` | `RPWM` | Orange | FINAL |
+| Center / motor1 | `PB8` (`TIM16_CH1`) | `LPWM` | Yellow | FINAL |
+| Center / motor1 | `PB9` | `R_EN` + `L_EN`, tied together | Green | FINAL common enable |
+| Rear / motor2 | `PB14` | `RPWM` | Orange | FINAL |
+| Rear / motor2 | `PB15` | `LPWM` | Yellow | FINAL |
+| Rear / motor2 | `PB10` | `R_EN` + `L_EN`, tied together | Green | FINAL common enable |
 
 Connect both enable inputs of each driver to its single common-enable GPIO.
 Add one 10 kohm pull-down from each common-enable net to GND so all drivers
@@ -310,6 +431,18 @@ Left and Right only. Raspberry Pi has no permanent CAN transceiver. A USB-CAN
 adapter may be attached temporarily during firmware service.
 
 ## Power and grounding rules
+
+Planned MP1584EN count:
+
+| Quantity | Setting | Power domain |
+| --- | --- | --- |
+| 1 | `3.30 V` | All shared 3.3 V loads: ESP32, both STM32 nodes, CAN, sensors, encoders, and IBT-2 logic |
+| 1 | `5.00 V` | XR4 and M100-5883 |
+
+The normal plan therefore uses two MP1584EN modules. Raspberry Pi 5, motor
+power, and lighting do not use these modules. See the detailed
+[low-voltage power budget](power-budget.md) for per-load allocations and
+measurement requirements.
 
 - Battery/motor power, Raspberry Pi 5 V, ESP32/XR4 5 V, STM32/sensors, and
   lighting need appropriately rated protected branches.

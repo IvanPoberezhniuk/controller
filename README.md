@@ -120,6 +120,7 @@ motor-driver hardware. `UGV_CURRENT_SENSE_CALIBRATED` remains `0`, so firmware
 does not treat placeholder readings as valid current measurements.
 
 See [architecture](docs/architecture.md), [wiring and wire colors](docs/wiring.md),
+[low-voltage power budget](docs/power-budget.md),
 [CubeMX configuration](docs/cubemx-configuration.md),
 [CAN protocol](docs/can-protocol.md), and the node pinout documents under
 `docs/`.

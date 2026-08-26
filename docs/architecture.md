@@ -27,6 +27,7 @@
         encoders         encoders
         direct ADC       direct ADC
         local safety     local safety
+        shared 3V3       shared 3V3
 
  Raspberry Pi 5 ------ Wi-Fi video ------> operator phone/laptop
 ```
@@ -36,6 +37,13 @@ Right. Each uses its own SN65HVD230 transceiver. Raspberry Pi has no CAN
 transceiver and no CAN wiring. The two STM32 nodes close their own speed-control
 and safety loops. The ESP32 chooses the active command source but never
 performs motor PID control.
+
+One MP1584EN adjusted to 3.30 V supplies a star-distributed shared logic rail
+for the ESP32 board, both STM32 nodes, all three SN65HVD230 transceivers, six
+motor encoders, six AHC244D-equipped IBT-2 logic interfaces, and central 3.3 V
+peripherals. Its design allocation is 2 A / 6.6 W. A second MP1584EN adjusted
+to 5.00 V supplies XR4 and M100-5883. Raspberry Pi 5, BTS7960 motor power, and
+lights remain on separate appropriately rated protected power branches.
 
 Manual control is independent of Raspberry Pi and Wi-Fi. If either fails, the
 ELRS/XR4 to ESP32 to CAN path remains operational; only video, Pi logging, and
