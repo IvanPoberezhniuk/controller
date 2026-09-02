@@ -75,8 +75,8 @@ void Error_Handler(void);
 #define MOTOR2_EN_GPIO_Port GPIOB
 #define MOTOR2_LIS_Pin GPIO_PIN_12
 #define MOTOR2_LIS_GPIO_Port GPIOB
-#define MOTOR1_LPWM_Pin GPIO_PIN_8
-#define MOTOR1_LPWM_GPIO_Port GPIOB
+#define MOTOR1_LPWM_Pin GPIO_PIN_15
+#define MOTOR1_LPWM_GPIO_Port GPIOA
 #define MOTOR1_EN_Pin GPIO_PIN_9
 #define MOTOR1_EN_GPIO_Port GPIOB
 

@@ -21,7 +21,7 @@ static const motor_hw_t s_hw[UGV_MOTOR_COUNT] = {
     },
     [MOTOR_CENTER] = {
         .rpwm_timer = &htim1,
-        .lpwm_timer = &htim16,
+        .lpwm_timer = &htim8,
         .lpwm_channel = TIM_CHANNEL_1,
         .rpwm_channel = TIM_CHANNEL_3,
         .enable_port = MOTOR1_COMMON_EN_GPIO_Port,
