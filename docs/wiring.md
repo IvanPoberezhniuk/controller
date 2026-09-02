@@ -333,7 +333,7 @@ the module header `VCC` and connect STM32 `GND` to module header `GND`.
 | Front / motor0 | `PA9` | `LPWM` | Yellow | FINAL |
 | Front / motor0 | `PB0` | `R_EN` + `L_EN`, tied together | Green | FINAL common enable |
 | Center / motor1 | `PA10` | `RPWM` | Orange | FINAL |
-| Center / motor1 | `PB8` (`TIM16_CH1`) | `LPWM` | Yellow | FINAL |
+| Center / motor1 | `PA15` (`TIM8_CH1`, header label `A15`) | `LPWM` | Yellow | FINAL |
 | Center / motor1 | `PB9` | `R_EN` + `L_EN`, tied together | Green | FINAL common enable |
 | Rear / motor2 | `PB14` | `RPWM` | Orange | FINAL |
 | Rear / motor2 | `PB15` | `LPWM` | Yellow | FINAL |
@@ -387,15 +387,16 @@ bootloader and application both configure these pins.
 | --- | --- | --- | --- |
 | USART2 TX / adapter RX | `PA2` | Orange | Console and factory ROM provisioning |
 | USART2 RX / adapter TX | `PA3` | White | Console and factory ROM provisioning |
-| BOOT0 jumper to `3V3` | `PB8` | Violet | Provisioning only; normally open, 10 kohm pull-down |
+| ROM boot select | Onboard `BOOT0` button | No wire | Hold BOOT0, tap NRST, then release BOOT0 |
 | SWDIO | `PA13` | Blue | Optional debug/recovery test pad |
 | SWCLK | `PA14` | Yellow | Optional debug/recovery test pad |
 | NRST | `NRST` | Gray | Reset/programming test point |
 | Ground | `GND` | Black | Programming/debug reference |
 
-PB8 is both BOOT0 and the final center `LPWM`. Never fit the BOOT0 jumper while
-motor power is connected. For first programming without ST-Link, follow
-[`firmware-update.md`](firmware-update.md).
+PB8 exists on the MCU but is connected to the WeAct board's BOOT0 button and is
+not exposed on the side headers. Do not add a BOOT0 jumper. The center LPWM is
+the lower-row `A15` pin, between `A12` and `NC`. Keep motor power disconnected
+during provisioning and follow [`firmware-update.md`](firmware-update.md).
 
 ## Raspberry Pi Wi-Fi camera node
 

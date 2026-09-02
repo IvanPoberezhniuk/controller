@@ -14,13 +14,14 @@ incorrectly.
 
 1. In TIM1 disable PWM Generation CH4 on PA11. Keep CH1/CH2/CH3 on
    PA8/PA9/PA10.
-2. Enable TIM16, internal clock, PWM Generation CH1 on PB8. Set Prescaler `0`,
+2. Enable TIM8, internal clock, PWM Generation CH1 on PA15. Set Prescaler `0`,
    Counter Period `8499`, Pulse `0`, PWM mode 1, active-high. Label it
    `MOTOR1_LPWM`.
 3. Use one common-enable output per motor: PB0=`MOTOR0_EN`, PB9=`MOTOR1_EN`,
    PB10=`MOTOR2_EN`. Configure them push-pull, no pull, low speed, initial low.
    Each output fans out to both R_EN and L_EN inputs of its own driver. Remove
-   the old PB1/PB11 enable outputs; PB8 changes to TIM16 in step 2.
+   the old PB1/PB11 enable outputs. PB8 is the onboard BOOT0-button signal and
+   is not exposed on the WeAct board headers.
 4. Keep all six direct current-sense inputs. ADC2 must be a five-rank,
    single-ended scan: rank1 PA6/IN3 front R_IS, rank2 PA7/IN4 front L_IS,
    rank3 PB2/IN12 rear R_IS, rank4 PA5/IN13 center L_IS, rank5 PA4/IN17 center
@@ -36,7 +37,7 @@ incorrectly.
    fields; the application update service uses standard filter index 0 and RX
    FIFO0.
 8. Generate code with **Keep User Code when re-generating** enabled. Confirm
-   `MX_TIM16_Init()` and `MX_FDCAN1_Init()` are called before
+   `MX_TIM8_Init()` and `MX_FDCAN1_Init()` are called before
    `app_main_init()`.
 9. Build both OTA applications and bootloaders with
    `tools/build-update-images.ps1`. The final pinout is unconditional.
@@ -53,7 +54,7 @@ remains a recovery path even if an application image is broken.
 
 | Setting | Value | Why |
 |---|---|---|
-| MCU | STM32G431CBTx | Confirmed hardware — LQFP48, 128KB flash, 32KB RAM, Cortex-M4F. Selected directly (not via a Nucleo board), since this is a custom PCB. |
+| MCU | STM32G431CBTx | Confirmed hardware — LQFP48, 128KB flash, 32KB RAM, Cortex-M4F. Selected directly because CubeMX does not provide the third-party WeAct core board as a board preset. |
 | Toolchain/IDE | CMake | Portable, works with VS Code, not tied to a specific IDE's project format. |
 | Application Structure | Advanced | Gives finer per-peripheral parameter control in the CubeMX GUI. **Not** physical file separation — checked the actual generated tree and every `MX_*_Init()` (`MX_TIM1_Init`, `MX_ADC2_Init`, etc.) still lands in `firmware/stm32-common/Core/Src/main.c`, not separate `tim.c`/`adc.c`/`usart.c` files. Hand-written application code stays outside generated `Core/`; platform-neutral CAN definitions live in `shared/can`. |
 
@@ -86,21 +87,20 @@ tick was silently running ~10.6x too fast until caught and fixed.
 | Prescaler | 0 | No division — full 170 MHz timer clock. |
 | Counter Period (ARR) | 8499 | `170,000,000 / 20,000 Hz − 1 = 8499` at the current 170 MHz timer clock. 20 kHz is a common brushed-DC PWM carrier frequency: high enough to be inaudible/efficient, comfortably within the BTS7960 driver's switching range. (Was `799` back when SYSCLK was 16 MHz with no PLL — recomputed after the clock change; the target frequency, 20 kHz, didn't change, only the register value needed to hit it. Bonus of the higher clock: duty-cycle resolution improved from 800 steps to 8500 steps.) |
 
-## TIM16 — center LPWM
+## TIM8 — center LPWM
 
 | Field | Value | Why |
 |---|---|---|
-| Channel 1 | PWM Generation CH1 on PB8 | Replaces TIM1_CH4/PA11 and frees PA11 for FDCAN RX. PB8 also serves as BOOT0 during one-time provisioning. |
+| Channel 1 | PWM Generation CH1 on PA15 | Replaces TIM1_CH4/PA11 and frees PA11 for FDCAN RX. PA15 is exposed as `A15` on the WeAct lower header, between `A12` and `NC`. |
 | Clock source | Internal clock | Uses the same 170 MHz timer clock as TIM1. |
-| Prescaler / Period / Pulse | `0` / `8499` / `0` | 20 kHz, initially zero duty. Application code always uses `htim16` for center LPWM. |
+| Prescaler / Period / Pulse | `0` / `8499` / `0` | 20 kHz, initially zero duty. Application code always uses `htim8` for center LPWM. |
 
 ## TIM15 — motor2 PWM
 
 Same reasoning as TIM1 (Internal Clock, Prescaler 0, Period 8499 → 20 kHz).
-TIM15 was used instead of the more "expected" TIM8 because TIM8's default
-channel pins (`PC6`–`PC9`) aren't broken out on this 48-pin package — TIM15
-is a smaller general-purpose timer that *is* available here, with the two
-channels this motor needs.
+TIM15 supplies the two rear-motor channels on exposed PB14/PB15. TIM8 is used
+only for the center LPWM through its PA15 alternate mapping; its usual
+PC6–PC9 channel pins are not available on this board.
 
 ## TIM2 / TIM3 / TIM4 — encoders (motor0 / motor1 / motor2)
 
@@ -149,7 +149,7 @@ factory-provisioning session.
 ## Direct current sensing: ADC2 scan
 
 This five-rank scan is the final architecture and is already represented in
-`UGV_MotorNode.ioc`. Preserve it while making the FDCAN/TIM16 changes.
+`UGV_MotorNode.ioc`. Preserve it while making the FDCAN/TIM8 changes.
 
 | Field | Value | Why |
 |---|---|---|
@@ -189,7 +189,7 @@ ADC1 remains enabled for the sixth direct current-sense signal.
 | Pin | Label | Why this pin |
 |---|---|---|
 | PB0 | `MOTOR0_EN` | Drives front-driver R_EN and L_EN together. |
-| PB9 | `MOTOR1_EN` | Drives center-driver R_EN and L_EN together; PB8 is center LPWM. |
+| PB9 | `MOTOR1_EN` | Drives center-driver R_EN and L_EN together; PA15 is center LPWM. |
 | PB10 | `MOTOR2_EN` | Drives rear-driver R_EN and L_EN together. |
 
 PB1, PB11, and PB13 are free GPIO reserve. Each motor still has an
@@ -201,6 +201,7 @@ power to the other two. Fit a 10 kohm pull-down on every common-enable net.
 | Pin(s) | Why |
 |---|---|
 | PA13 / PA14 | SWDIO/SWCLK — the ST-Link debug/programming lines. Reassigning these (which happened accidentally once, via an errant I2C1 config, and was caught and reverted) would break the ability to flash/debug over SWD. |
+| PB8 / BOOT0 | Connected to the onboard BOOT0 button and not exposed on the WeAct side headers. Do not assign external harness signals to it. |
 | PB3 | SWO trace pin — left alone to keep debug tracing available, even though it's not currently used. |
 | PC14 / PC15 | Reserved for the LSE 32.768 kHz crystal, in case an RTC is added later. |
 
@@ -212,12 +213,13 @@ power to the other two. Fit a 10 kohm pull-down on every common-enable net.
 4. **Multi-channel ADC scan sequences need each Rank's Channel set individually** — leaving it unset after the first Rank causes every Rank to silently reuse the first channel.
 5. **Encoder Mode has three options (TI1 / TI2 / TI1 and TI2)** that all "work" (compile, no CubeMX warning) but only "TI1 and TI2" gives full quadrature resolution — the other two silently halve it.
 6. **Raising SYSCLK in CubeMX does not recompute every raw peripheral field.** Re-check ADC and PWM settings after a clock-tree change. Application PWM writes read the live timer ARR, and TIM6 derives its runtime prescaler/ARR from APB1, so those consumers no longer duplicate the 170 MHz literal.
+7. **A pin available on the MCU package may still be unavailable on the carrier board.** PB8 exists on the STM32G431 and CubeMX accepts it, but the WeAct board routes it to the onboard BOOT0 button and does not expose it on either side header. The center LPWM therefore uses exposed PA15/TIM8_CH1.
 
 ## FDCAN1 — motor network and firmware update
 
 | Field | Value | Why |
 |---|---|---|
-| Pins | PA11 RX, PA12 TX | Keeps CAN away from PB8/BOOT0 and matches the custom bootloader. |
+| Pins | PA11 RX, PA12 TX | Keeps CAN on exposed header pins and matches the custom bootloader. |
 | Kernel clock | PCLK1, 170 MHz | Already available with the current undivided clock tree. |
 | Frame format / mode | Classic CAN / Normal | Compatible with ESP32 TWAI and a temporary SocketCAN service adapter. Raspberry Pi is not on the bus. |
 | Auto retransmission | Enabled | Hardware retries arbitration/errors; higher-level OTA sequence ACK still handles lost windows. |

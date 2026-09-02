@@ -66,10 +66,11 @@ a partial program. There is one application slot, so this is safe recovery but
 not A/B rollback.
 
 A blank MCU needs the custom bootloader installed once through the factory ROM
-USART2 interface on PA2/PA3 with BOOT0/PB8. The STM32G431 ROM bootloader does
-not expose FDCAN. After that first provisioning, ST-Link and UART are not
-needed for normal application updates. See
-[`firmware-update.md`](firmware-update.md).
+USART2 interface on PA2/PA3. On the WeAct STM32G431 core board, enter the ROM
+bootloader with its onboard BOOT0 and NRST buttons; PB8 is not exposed on the
+headers. The STM32G431 ROM bootloader does not expose FDCAN. After that first
+provisioning, ST-Link and UART are not needed for normal application updates.
+See [`firmware-update.md`](firmware-update.md).
 
 ## Control authority
 
@@ -149,7 +150,7 @@ reported GPS interference when RF and GNSS hardware are placed close together.
 The CAN update protocol, STM32 bootloader, flash validation/recovery logic,
 application-to-bootloader handoff, and Linux SocketCAN service uploader are
 implemented and host-tested, but not yet validated on assembled hardware. The
-checked-in CubeMX project contains the final FDCAN1, TIM16, common-enable, and
+checked-in CubeMX project contains the final FDCAN1, TIM8, common-enable, and
 six direct current-sense ADC configuration.
 
 The application-side FDCAN code currently owns only the update-entry filter.

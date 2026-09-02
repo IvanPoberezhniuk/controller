@@ -19,7 +19,7 @@ Run from the repository root on the development PC:
 .\tools\build-update-images.ps1
 ```
 
-The final FDCAN/TIM16/common-enable pinout is already generated and is always
+The final FDCAN/TIM8/common-enable pinout is already generated and is always
 used by this command. The outputs are:
 
 | Node | One-time image at `0x08000000` | CAN application image |
@@ -38,28 +38,28 @@ Use a 3.3 V USB-UART adapter. Do not use a 5 V logic-level adapter. Disconnect
 motor power and make sure every BTS7960 enable has a hardware pull-down before
 starting.
 
-| USB-UART / control | STM32G431 | Color | Note |
+| USB-UART / control | WeAct STM32G431 board | Color | Note |
 | --- | --- | --- | --- |
 | Adapter TX | `PA3 / USART2_RX` | White | Signals cross |
 | Adapter RX | `PA2 / USART2_TX` | Orange | Signals cross |
 | Adapter GND | `GND` | Black | Common reference |
-| `3V3` through removable jumper | `PB8 / BOOT0` | Violet | High only while entering ROM bootloader |
-| Reset button/test lead | `NRST` | Gray | Pulse low after BOOT0 is high |
+| BOOT control | Onboard `BOOT0` button | No wire | Hold only while entering the ROM bootloader; PB8 is not on the headers |
+| Reset control | Onboard `NRST` button | No wire | Tap while BOOT0 is held |
 
-Fit a 10 kohm pull-down from PB8/BOOT0 to GND. PB8 is also the final center
-motor `LPWM` output (`TIM16_CH1`), so the BOOT0 jumper must be open before motor
-power is restored.
+Do not add a BOOT0 jumper or external PB8 pull-down to the WeAct board. Use its
+existing BOOT0-button circuit. The center motor LPWM is on exposed PA15/TIM8_CH1
+and is unrelated to boot selection.
 
 Provision each board separately:
 
 1. Disconnect the CAN transceiver or leave the CAN bus unpowered; disconnect
    motor power.
 2. Connect TX, RX, and GND as shown above.
-3. Pull PB8/BOOT0 high, then pulse NRST low or power-cycle the STM32.
+3. Hold the onboard BOOT0 button, press and release NRST, then release BOOT0.
 4. In STM32CubeProgrammer select **UART**, 115200 8E1, and connect.
 5. Program the matching `UGV_BOOTLOADER_LEFT.bin` or
    `UGV_BOOTLOADER_RIGHT.bin` at address `0x08000000`, then verify it.
-6. Disconnect CubeProgrammer, remove the BOOT0 jumper, and reset the board.
+6. Disconnect CubeProgrammer and press NRST normally without holding BOOT0.
 7. The custom bootloader now keeps the motor outputs low and waits on CAN,
    because no valid application metadata exists yet.
 
