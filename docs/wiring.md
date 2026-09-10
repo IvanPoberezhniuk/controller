@@ -38,8 +38,10 @@ Keep node stubs short and do not wire CAN as a passive star.
 | Ground/reference | Black | `GND`; never use black for a driven signal |
 | CAN-H | Yellow | Twist together with CAN-L |
 | CAN-L | Green | Twist together with CAN-H |
-| Device/transceiver to controller | White | UART TX or CAN RXD entering an MCU |
-| Controller to device/transceiver | Orange | UART TX or CAN TXD leaving an MCU |
+| UART device TX to controller RX | White | UART signal entering an MCU |
+| UART controller TX to device RX | Orange | UART signal leaving an MCU |
+| CAN transceiver `R/RXD` to MCU CAN RX | Purple | CAN receive logic signal entering an MCU |
+| MCU CAN TX to CAN transceiver `D/TXD` | Brown | CAN transmit logic signal leaving an MCU |
 | I2C SDA | Blue | Use the same convention on both I2C buses |
 | I2C SCL | Yellow | Separate harness from CAN to avoid confusion |
 | Interrupt/button | White | Add a printed signal label |
@@ -130,18 +132,19 @@ with all output loads disconnected, power-cycle it, and verify `3.30 V` or
 
 | From | To | Color | Status / note |
 | --- | --- | --- | --- |
-| ESP32 `GPIO17` (`TWAI_TX`) | SN65HVD230 `D/TXD` | Orange | FINAL; add 10 kohm pull-up to 3V3 |
-| SN65HVD230 `R/RXD` | ESP32 `GPIO18` (`TWAI_RX`) | White | FINAL; logic-side signal |
-| ESP32 `3V3` | SN65HVD230 `VCC` | Red, label `3V3` | Never power this part from 5 V |
-| ESP32 `GND` | Transceiver `GND` | Black | Common signal reference |
-| Transceiver `CANH` | CAN-H trunk | Yellow | Twisted pair |
-| Transceiver `CANL` | CAN-L trunk | Green | Twisted pair |
-| SN65HVD230 `RS` | `GND` | Black | High-speed mode; often handled on modules |
-| SN65HVD230 `Vref` | Not connected | No wire | Leave floating when unused |
+| ESP32 `GPIO17` (`TWAI_TX`) | Module `TX` (SN65HVD230 `D/TXD`) | Brown | FINAL; add 10 kohm pull-up to 3V3 |
+| Module `RX` (SN65HVD230 `R/RXD`) | ESP32 `GPIO18` (`TWAI_RX`) | Purple | FINAL; logic-side signal |
+| ESP32 `3V3` | Module `3.3V` (SN65HVD230 `VCC`) | Red, label `3V3` | Never power this part from 5 V |
+| ESP32 `GND` | Module `GND` | Black | Common signal reference |
+| Module screw terminal `CANH` | CAN-H trunk | Yellow | Twisted pair |
+| Module screw terminal `CANL` | CAN-L trunk | Green | Twisted pair |
 
 Place 100 nF directly across transceiver VCC/GND and a CAN TVS such as
 SM24CANB close to the bus connector. ESP32 GPIOs must never connect directly
-to CAN-H/CAN-L.
+to CAN-H/CAN-L. On the pictured four-pin module, `RS` and `Vref` are handled on
+the PCB and are not exposed on the header. Its yellow two-pin jumper enables
+the onboard 120 ohm CANH-to-CANL terminator; install that jumper only when this
+module is at a physical end of the CAN trunk.
 
 ### SH1106 OLED
 
@@ -368,14 +371,12 @@ future function is deliberately added to both the schematic and CubeMX file.
 
 | From | To | Color | Status / note |
 | --- | --- | --- | --- |
-| STM32 `PA12 / FDCAN1_TX` | SN65HVD230 `D/TXD` | Orange | FINAL; 10 kohm pull-up to 3V3 |
-| SN65HVD230 `R/RXD` | STM32 `PA11 / FDCAN1_RX` | White | FINAL |
-| STM32 `3V3` | SN65HVD230 `VCC` | Red, label `3V3` | Never connect to 5 V |
-| STM32 `GND` | Transceiver `GND` | Black | Common signal reference |
-| Transceiver `CANH` | CAN-H trunk | Yellow | Twisted with CAN-L |
-| Transceiver `CANL` | CAN-L trunk | Green | Twisted with CAN-H |
-| SN65HVD230 `RS` | `GND` | Black | High-speed mode; often handled on modules |
-| SN65HVD230 `Vref` | Not connected | No wire | Leave floating when unused |
+| STM32 `PA12 / FDCAN1_TX` | Module `TX` (SN65HVD230 `D/TXD`) | Brown | FINAL; 10 kohm pull-up to 3V3 |
+| Module `RX` (SN65HVD230 `R/RXD`) | STM32 `PA11 / FDCAN1_RX` | Purple | FINAL |
+| STM32 `3V3` | Module `3.3V` (SN65HVD230 `VCC`) | Red, label `3V3` | Never connect to 5 V |
+| STM32 `GND` | Module `GND` | Black | Common signal reference |
+| Module screw terminal `CANH` | CAN-H trunk | Yellow | Twisted with CAN-L |
+| Module screw terminal `CANL` | CAN-L trunk | Green | Twisted with CAN-H |
 
 PA11/PA12 connect only to the transceiver logic pins, never directly to
 CAN-H/CAN-L. Place 100 nF at VCC/GND and SM24CANB at the bus connector. The
@@ -427,9 +428,10 @@ between CAN-H and CAN-L should be approximately 60 ohms when both terminators
 are installed.
 
 Only STM32 Left, ESP32, and STM32 Right are permanent CAN nodes, each with one
-SN65HVD230. If that is also their physical order, enable 120 ohm termination at
-Left and Right only. Raspberry Pi has no permanent CAN transceiver. A USB-CAN
-adapter may be attached temporarily during firmware service.
+SN65HVD230 module. If that is also their physical order, install the pictured
+module's yellow 120 ohm termination jumper at Left and Right only; leave the
+ESP32 module's jumper removed. Raspberry Pi has no permanent CAN transceiver.
+A USB-CAN adapter may be attached temporarily during firmware service.
 
 ## Power and grounding rules
 

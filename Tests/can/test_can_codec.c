@@ -41,6 +41,29 @@ static void test_system_enable(void)
     assert(!ugv_can_decode_system_enable(&decoded, payload, sizeof(payload)));
 }
 
+static void test_wheel_targets(void)
+{
+    const ugv_can_wheel_targets_t source = {
+        .sequence = 43u,
+        .enabled_mask = UGV_CAN_WHEEL_ENABLE_CENTER |
+                        UGV_CAN_WHEEL_ENABLE_REAR,
+        .front_rpm = 0,
+        .center_rpm = -120,
+        .rear_rpm = 200,
+    };
+    uint8_t payload[UGV_CAN_WHEEL_TARGETS_LEFT_DLC] = {0};
+    ugv_can_wheel_targets_t decoded = {0};
+
+    assert(ugv_can_encode_wheel_targets(payload, sizeof(payload), &source));
+    assert(payload[1] == 0x06u);
+    assert(payload[4] == 0x88u && payload[5] == 0xffu);
+    assert(ugv_can_decode_wheel_targets(&decoded, payload, sizeof(payload)));
+    assert(memcmp(&decoded, &source, sizeof(source)) == 0);
+
+    payload[1] = 0x80u;
+    assert(!ugv_can_decode_wheel_targets(&decoded, payload, sizeof(payload)));
+}
+
 static void test_aux_lighting(void)
 {
     const ugv_can_aux_lighting_t source = {75u, 25u, 1u, 0u};
@@ -130,6 +153,7 @@ static void test_invalid_arguments_and_lengths(void)
 int main(void)
 {
     test_motion();
+    test_wheel_targets();
     test_system_enable();
     test_aux_lighting();
     test_control_status();

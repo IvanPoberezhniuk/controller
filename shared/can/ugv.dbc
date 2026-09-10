@@ -1,4 +1,4 @@
-VERSION "2.0"
+VERSION "3.0"
 
 NS_ :
     NS_DESC_
@@ -26,6 +26,20 @@ BO_ 257 AutoMotionRequest: 8 RPI
  SG_ RightTargetRpm : 32|16@1- (1,0) [-32768|32767] "rpm" ESP32_AUX
  SG_ LimitPct : 48|8@1+ (1,0) [0|100] "%" ESP32_AUX
  SG_ Reserved : 56|8@1+ (1,0) [0|255] "" ESP32_AUX
+
+BO_ 258 WheelTargetsLeft: 8 ESP32_AUX
+ SG_ Sequence : 0|8@1+ (1,0) [0|255] "" STM32_LEFT
+ SG_ EnabledMask : 8|8@1+ (1,0) [0|7] "" STM32_LEFT
+ SG_ FrontRpm : 16|16@1- (1,0) [-32768|32767] "rpm" STM32_LEFT
+ SG_ CenterRpm : 32|16@1- (1,0) [-32768|32767] "rpm" STM32_LEFT
+ SG_ RearRpm : 48|16@1- (1,0) [-32768|32767] "rpm" STM32_LEFT
+
+BO_ 259 WheelTargetsRight: 8 ESP32_AUX
+ SG_ Sequence : 0|8@1+ (1,0) [0|255] "" STM32_RIGHT
+ SG_ EnabledMask : 8|8@1+ (1,0) [0|7] "" STM32_RIGHT
+ SG_ FrontRpm : 16|16@1- (1,0) [-32768|32767] "rpm" STM32_RIGHT
+ SG_ CenterRpm : 32|16@1- (1,0) [-32768|32767] "rpm" STM32_RIGHT
+ SG_ RearRpm : 48|16@1- (1,0) [-32768|32767] "rpm" STM32_RIGHT
 
 BO_ 272 SystemEnable: 2 ESP32_AUX
  SG_ Enabled : 0|8@1+ (1,0) [0|1] "" STM32_LEFT,STM32_RIGHT,RPI

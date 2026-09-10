@@ -1,0 +1,45 @@
+#ifndef UGV_MANUAL_CONTROL_H
+#define UGV_MANUAL_CONTROL_H
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "ugv_can_protocol.h"
+#include "ugv_crsf.h"
+
+enum {
+    UGV_RC_STEERING_CHANNEL = 0, /* EdgeTX CH1 / Aileron */
+    UGV_RC_THROTTLE_CHANNEL = 1, /* EdgeTX CH2 / Elevator */
+    UGV_RC_DRIVE_MODE_CHANNEL = 2, /* CH3: 2WD / 4WD / 6WD */
+    UGV_RC_ARM_CHANNEL = 4,      /* EdgeTX CH5 / two-position switch */
+    UGV_RC_ESTOP_CHANNEL = 5,    /* EdgeTX CH6 / emergency stop */
+};
+
+#define UGV_RC_MAX_RPM 200.0f
+
+typedef struct {
+    bool link_up;
+    bool armed;
+    bool arm_low_seen;
+    bool previous_arm_high;
+    bool emergency_stop_latched;
+    uint32_t last_channels_ms;
+    uint32_t last_link_stats_ms;
+    float steering;
+    float throttle;
+    uint8_t drive_mode;
+    uint8_t wheel_enable_mask;
+    int16_t left_rpm[3];
+    int16_t right_rpm[3];
+} ugv_manual_control_t;
+
+void ugv_manual_control_init(ugv_manual_control_t *control);
+void ugv_manual_control_note_channels(ugv_manual_control_t *control,
+                                      uint32_t now_ms);
+void ugv_manual_control_note_link_stats(ugv_manual_control_t *control,
+                                        uint32_t now_ms);
+void ugv_manual_control_update(ugv_manual_control_t *control,
+                               const ugv_crsf_receiver_t *radio,
+                               uint32_t now_ms);
+
+#endif /* UGV_MANUAL_CONTROL_H */

@@ -11,6 +11,7 @@ add_subdirectory(cmake/stm32cubemx)
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/app_main.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/can_control_service.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/configuration.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/current_monitor.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/encoder.c

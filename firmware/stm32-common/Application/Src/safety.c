@@ -4,22 +4,30 @@
 #include "encoder.h"
 #include "fault_manager.h"
 #include "board.h"
+#include "ugv_can_protocol.h"
 
 static safety_state_t s_state;
 static uint32_t s_last_command_tick_ms;
+static bool s_command_received;
 static bool s_emergency_stop_active;
 static bool s_arm_requested;
+static bool s_disarm_requested;
 static bool s_fault_clear_requested;
 static bool s_estop_clear_requested;
+static uint8_t s_motor_enable_mask;
 
 static bool command_stale(void)
 {
-    return (HAL_GetTick() - s_last_command_tick_ms) > config_get()->command_timeout_ms;
+    return !s_command_received ||
+           (HAL_GetTick() - s_last_command_tick_ms) > config_get()->command_timeout_ms;
 }
 
 static bool any_motor_faulted(void)
 {
     for (motor_index_t m = 0; m < UGV_MOTOR_COUNT; m++) {
+        if ((s_motor_enable_mask & (1u << (unsigned)m)) == 0u) {
+            continue;
+        }
         const MotorState *st = motor_control_get_state(m);
         if (st->stalled || st->overcurrent || st->driver_fault || !st->encoder_valid) {
             return true;
@@ -47,15 +55,19 @@ void safety_init(void)
 {
     s_state = SAFETY_STATE_BOOT;
     s_last_command_tick_ms = HAL_GetTick();
+    s_command_received = false;
     s_emergency_stop_active = false;
     s_arm_requested = false;
+    s_disarm_requested = false;
     s_fault_clear_requested = false;
     s_estop_clear_requested = false;
+    s_motor_enable_mask = 0u;
 }
 
 void safety_notify_command_received(void)
 {
     s_last_command_tick_ms = HAL_GetTick();
+    s_command_received = true;
 }
 
 void safety_request_arm(void)
@@ -63,6 +75,16 @@ void safety_request_arm(void)
     if (s_state == SAFETY_STATE_DISABLED) {
         s_arm_requested = true;
     }
+}
+
+void safety_request_disarm(void)
+{
+    s_disarm_requested = true;
+}
+
+void safety_set_motor_enable_mask(uint8_t mask)
+{
+    s_motor_enable_mask = mask & UGV_CAN_WHEEL_ENABLE_ALL;
 }
 
 void safety_request_emergency_stop(void)
@@ -97,13 +119,30 @@ static void enable_motors_that_are_ok(void)
 {
     for (motor_index_t m = 0; m < UGV_MOTOR_COUNT; m++) {
         const MotorState *st = motor_control_get_state(m);
-        bool ok = !st->stalled && !st->overcurrent && !st->driver_fault && st->encoder_valid;
+        const bool requested =
+            (s_motor_enable_mask & (1u << (unsigned)m)) != 0u;
+        bool ok = requested && !st->stalled && !st->overcurrent &&
+                  !st->driver_fault && st->encoder_valid;
         motor_control_set_enabled(m, ok);
     }
 }
 
 void safety_update(void)
 {
+    if (s_disarm_requested) {
+        s_disarm_requested = false;
+        s_arm_requested = false;
+        if (s_state == SAFETY_STATE_ARMING ||
+            s_state == SAFETY_STATE_READY ||
+            s_state == SAFETY_STATE_ACTIVE ||
+            s_state == SAFETY_STATE_DEGRADED) {
+            motor_control_disable_all();
+            s_command_received = false;
+            s_motor_enable_mask = 0u;
+            s_state = SAFETY_STATE_DISABLED;
+        }
+    }
+
     switch (s_state) {
         case SAFETY_STATE_BOOT:
             motor_control_disable_all();
@@ -130,6 +169,7 @@ void safety_update(void)
         case SAFETY_STATE_ARMING:
             motor_control_disable_all();
             if (s_emergency_stop_active) {
+                s_motor_enable_mask = 0u;
                 s_state = SAFETY_STATE_EMERGENCY_STOP;
             } else if (command_stale()) {
                 s_state = SAFETY_STATE_DISABLED;
@@ -150,11 +190,13 @@ void safety_update(void)
             }
             if (s_emergency_stop_active) {
                 motor_control_disable_all();
+                s_motor_enable_mask = 0u;
                 s_state = SAFETY_STATE_EMERGENCY_STOP;
                 break;
             }
             if (command_stale()) {
                 motor_control_disable_all();
+                s_motor_enable_mask = 0u;
                 s_state = SAFETY_STATE_FAULT;
                 break;
             }

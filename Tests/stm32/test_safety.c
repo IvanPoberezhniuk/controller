@@ -8,6 +8,7 @@
 #include "fault_manager.h"
 #include "motor_control.h"
 #include "safety.h"
+#include "ugv_can_protocol.h"
 
 static uint32_t s_tick_ms;
 static MotorState s_motors[UGV_MOTOR_COUNT];
@@ -86,12 +87,28 @@ static void reset_fixture(void)
 
 static void arm_to_ready(void)
 {
+    safety_set_motor_enable_mask(UGV_CAN_WHEEL_ENABLE_ALL);
     safety_notify_command_received();
     safety_request_arm();
     safety_update();
     assert(safety_get_state() == SAFETY_STATE_ARMING);
     safety_update();
     assert(safety_get_state() == SAFETY_STATE_READY);
+}
+
+static void test_enable_mask_controls_individual_drivers(void)
+{
+    reset_fixture();
+    safety_set_motor_enable_mask(UGV_CAN_WHEEL_ENABLE_REAR);
+    safety_notify_command_received();
+    safety_request_arm();
+    safety_update();
+    safety_update();
+    safety_update();
+
+    assert(!s_motors[MOTOR_FRONT].enabled);
+    assert(!s_motors[MOTOR_CENTER].enabled);
+    assert(s_motors[MOTOR_REAR].enabled);
 }
 
 static void test_arm_requires_fresh_command(void)
@@ -164,11 +181,38 @@ static void test_estop_requires_state_scoped_clear(void)
     assert(safety_get_state() == SAFETY_STATE_DISABLED);
 }
 
+static void test_radio_disarm_is_immediate_and_does_not_clear_faults(void)
+{
+    reset_fixture();
+    arm_to_ready();
+    s_motors[MOTOR_FRONT].target_rpm = 100.0f;
+    safety_update();
+    assert(safety_get_state() == SAFETY_STATE_ACTIVE);
+
+    safety_request_disarm();
+    safety_update();
+    assert(safety_get_state() == SAFETY_STATE_DISABLED);
+    for (motor_index_t motor = 0; motor < UGV_MOTOR_COUNT; ++motor) {
+        assert(!s_motors[motor].enabled);
+        assert(s_motors[motor].target_rpm == 0.0f);
+    }
+
+    arm_to_ready();
+    s_tick_ms = 301u;
+    safety_update();
+    assert(safety_get_state() == SAFETY_STATE_FAULT);
+    safety_request_disarm();
+    safety_update();
+    assert(safety_get_state() == SAFETY_STATE_FAULT);
+}
+
 int main(void)
 {
     test_arm_requires_fresh_command();
+    test_enable_mask_controls_individual_drivers();
     test_requests_do_not_leak_across_states();
     test_motor_fault_latches_until_clear();
     test_estop_requires_state_scoped_clear();
+    test_radio_disarm_is_immediate_and_does_not_clear_faults();
     return 0;
 }

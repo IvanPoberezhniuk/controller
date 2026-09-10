@@ -2,11 +2,13 @@
 #define APPLICATION_FW_UPDATE_SERVICE_H
 
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
-/* Until the full operational FDCAN transport is added, this service owns one
- * exact-match filter for UGV_FW_CAN_ID_COMMAND and consumes only firmware
- * update commands. It is a no-op while CubeMX FDCAN remains disabled. */
-bool fw_update_service_init(void);
-void fw_update_service_poll(void);
+/* Called by the operational FDCAN dispatcher after it validates the standard
+ * data frame and DLC. Only a node-targeted ENTER command is acted on. */
+void fw_update_service_handle_frame(uint16_t identifier,
+                                    const uint8_t *payload,
+                                    size_t size);
 
 #endif /* APPLICATION_FW_UPDATE_SERVICE_H */

@@ -20,7 +20,8 @@ prevents its message table from drifting from the header.
 
 | CAN ID | DLC | Message | Producer | Consumers |
 | ---: | ---: | --- | --- | --- |
-| 0x100 | 8 | Final vehicle motion, signed RPM targets | ESP32 | Both STM32 nodes |
+| 0x102 | 8 | Left front/center/rear RPM targets and enable mask | ESP32 | STM32 Left |
+| 0x103 | 8 | Right front/center/rear RPM targets and enable mask | ESP32 | STM32 Right |
 | 0x110 | 2 | Final enable / emergency stop | ESP32 | Both STM32 nodes |
 | 0x130 | 8 | Active mode, source and CRSF link status | ESP32 | Optional CAN service monitor |
 | 0x180 / 0x181 | 8 | Local three-wheel RPM telemetry | Left / Right STM32 | ESP32, optional service monitor |
@@ -38,6 +39,7 @@ new logic around them; they can be removed in a later wire-protocol version.
 
 | CAN ID | Former purpose | Current status |
 | ---: | --- | --- |
+| 0x100 | Side-level final motion command | Reserved legacy format; replaced by per-wheel 0x102/0x103 |
 | 0x101 | Raspberry Pi autonomous motion request | Reserved; replaced by Pi-to-ESP32 Wi-Fi request |
 | 0x111 | Raspberry Pi autonomous enable request | Reserved; replaced by Pi-to-ESP32 Wi-Fi request |
 | 0x120 | Raspberry Pi auxiliary lighting request | Reserved; ESP32 owns local lighting |
@@ -63,18 +65,19 @@ commands remain unavailable while a node is in its bootloader. See
 [`firmware-update.md`](firmware-update.md) for the state flow and recovery
 procedure.
 
-All receivers reject an unexpected DLC and invalid bounded fields. Motion
+All receivers reject an unexpected DLC and invalid bounded fields. Wheel
 commands carry a sequence counter and must arrive every 10-20 ms. The ESP32 is
-the only producer allowed to use the final command IDs `0x100` and `0x110`.
+the only producer allowed to use the final command IDs `0x102`, `0x103`, and
+`0x110`.
 Raspberry Pi cannot compete for those identifiers because it is physically
 absent from CAN.
 
 The RC link timeout is 100 ms, the autonomous-request timeout is 300 ms, and
 the motor-node final-command timeout is 300 ms. Loss of the source selected by
 the operator causes a stop; it never automatically switches MANUAL/AUTO mode.
-Adding the FDCAN/TWAI transports must preserve the existing safe target reset
-and driver-disable behavior.
+The implemented FDCAN/TWAI transports preserve the safe target reset and
+driver-disable behavior.
 
-An individual six-wheel target frame is intentionally not assigned yet: six
-signed 16-bit RPM values require 12 data bytes and do not fit in one Classic
-CAN frame. Define a split-frame or scaled representation before adding it.
+Six signed 16-bit RPM values require 12 data bytes, so they are intentionally
+split into one eight-byte frame per side. Each contains sequence, a three-bit
+front/center/rear driver-enable mask, and three independent signed RPM values.

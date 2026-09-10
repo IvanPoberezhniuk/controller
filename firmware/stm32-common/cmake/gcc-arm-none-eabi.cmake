@@ -4,14 +4,26 @@ set(CMAKE_SYSTEM_PROCESSOR          arm)
 set(CMAKE_C_COMPILER_ID GNU)
 
 # Some default GCC settings
-# arm-none-eabi- must be part of path environment
 set(TOOLCHAIN_PREFIX                arm-none-eabi-)
 
-set(CMAKE_C_COMPILER                ${TOOLCHAIN_PREFIX}gcc)
+file(GLOB UGV_STM32_TOOLCHAIN_HINTS
+    "$ENV{LOCALAPPDATA}/stm32cube/bundles/gnu-tools-for-stm32/*/bin")
+find_program(UGV_ARM_GCC NAMES ${TOOLCHAIN_PREFIX}gcc
+    HINTS ${UGV_STM32_TOOLCHAIN_HINTS}
+    REQUIRED)
+get_filename_component(UGV_ARM_TOOLCHAIN_BIN "${UGV_ARM_GCC}" DIRECTORY)
+
+set(CMAKE_C_COMPILER                "${UGV_ARM_GCC}")
 set(CMAKE_ASM_COMPILER              ${CMAKE_C_COMPILER})
-set(CMAKE_LINKER                    ${TOOLCHAIN_PREFIX}gcc)
-set(CMAKE_OBJCOPY                   ${TOOLCHAIN_PREFIX}objcopy)
-set(CMAKE_SIZE                      ${TOOLCHAIN_PREFIX}size)
+set(CMAKE_LINKER                    "${UGV_ARM_GCC}")
+find_program(UGV_ARM_OBJCOPY NAMES ${TOOLCHAIN_PREFIX}objcopy
+    HINTS "${UGV_ARM_TOOLCHAIN_BIN}"
+    REQUIRED)
+find_program(UGV_ARM_SIZE NAMES ${TOOLCHAIN_PREFIX}size
+    HINTS "${UGV_ARM_TOOLCHAIN_BIN}"
+    REQUIRED)
+set(CMAKE_OBJCOPY "${UGV_ARM_OBJCOPY}" CACHE FILEPATH "" FORCE)
+set(CMAKE_SIZE "${UGV_ARM_SIZE}" CACHE FILEPATH "" FORCE)
 
 set(CMAKE_EXECUTABLE_SUFFIX_ASM     ".elf")
 set(CMAKE_EXECUTABLE_SUFFIX_C       ".elf")

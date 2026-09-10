@@ -12,6 +12,11 @@ bool ugv_can_encode_motion_cmd(uint8_t *payload, size_t size,
 bool ugv_can_decode_motion_cmd(ugv_can_motion_cmd_t *message,
                                const uint8_t *payload, size_t size);
 
+bool ugv_can_encode_wheel_targets(uint8_t *payload, size_t size,
+                                  const ugv_can_wheel_targets_t *message);
+bool ugv_can_decode_wheel_targets(ugv_can_wheel_targets_t *message,
+                                  const uint8_t *payload, size_t size);
+
 bool ugv_can_encode_system_enable(uint8_t *payload, size_t size,
                                   const ugv_can_system_enable_t *message);
 bool ugv_can_decode_system_enable(ugv_can_system_enable_t *message,

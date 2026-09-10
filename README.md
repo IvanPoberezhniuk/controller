@@ -104,17 +104,21 @@ idf.py -C firmware/esp32 set-target esp32s3
 idf.py -C firmware/esp32 build
 ```
 
-The ESP32 project currently provides the board definition, shared CAN codec,
-16 MB flash/8 MB octal PSRAM defaults, and a minimal bring-up application.
-Peripheral drivers are added independently after hardware validation.
+The ESP32 project provides the board definition, shared CAN codec, CRSF input
+from XR4, safe manual-control arbitration, and Classic CAN/TWAI output. See
+[manual radio control](docs/manual-radio-control.md) for channel assignments,
+arming, first-start checks, and the current drive-mode limitation.
 
 ## Current bring-up status
 
-The STM32 motor firmware is still at motor-node bring-up stage. The custom
-FDCAN bootloader, power-loss-safe flash state machine, application handoff, and
-Linux SocketCAN updater are implemented and host-tested. FDCAN1, TIM8, the
-three common-enable GPIOs, and direct six-channel current sampling are enabled
-in the checked-in CubeMX application project. The current-sense
+The manual radio command path is implemented end-to-end in firmware: XR4 CRSF
+to ESP32, ESP32 final commands over CAN, and CAN dispatch to the two STM32
+motor nodes. It is build-tested and host-tested but still requires careful
+validation on the assembled vehicle with the wheels raised. The custom FDCAN
+bootloader, power-loss-safe flash state machine, application handoff, and Linux
+SocketCAN updater are also implemented and host-tested. FDCAN1, TIM8, the three
+common-enable GPIOs, and direct six-channel current sampling are enabled in the
+checked-in CubeMX application project. The current-sense
 amperes-per-volt scale still requires calibration against the selected
 motor-driver hardware. `UGV_CURRENT_SENSE_CALIBRATED` remains `0`, so firmware
 does not treat placeholder readings as valid current measurements.

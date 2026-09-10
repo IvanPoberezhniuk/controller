@@ -13,13 +13,14 @@
 #include "safety.h"
 #include "configuration.h"
 #include "fw_update_service.h"
+#include "can_control_service.h"
+#include "ugv_can_protocol.h"
 #if defined(UGV_OTA_APP)
 #include "ugv_boot_request_stm32.h"
 #endif
 
-/* Bring-up-only debug-UART command console. Stand-in for the final ESP32 CAN
- * command path (0x100/0x110 messages) until the "add CAN" roadmap milestone --
- * see shared/can/ugv_can_protocol.h. Commands: "arm", "estop", "clear",
+/* Bring-up-only debug-UART command console. Normal runtime commands arrive
+ * from ESP32 over CAN. Commands: "arm", "estop", "clear", and
  * "m<index> <rpm>" e.g. "m0 120". */
 #define CMD_LINE_MAX 32
 static char    s_line[CMD_LINE_MAX];
@@ -28,6 +29,7 @@ static uint8_t s_line_len;
 static void process_command(const char *line)
 {
     if (strcmp(line, "arm") == 0) {
+        safety_set_motor_enable_mask(UGV_CAN_WHEEL_ENABLE_ALL);
         safety_request_arm();
         safety_notify_command_received();
     } else if (strcmp(line, "estop") == 0) {
@@ -124,7 +126,7 @@ void app_main_init(void)
     current_monitor_init();
     fault_manager_init();
     safety_init();
-    (void)fw_update_service_init();
+    (void)can_control_service_init();
 
     char buf[80];
     int len = snprintf(buf, sizeof(buf), "\r\nUGV %s node boot, reset=%s\r\n",
@@ -136,7 +138,7 @@ void app_main_init(void)
 
 void app_main_run(void)
 {
-    fw_update_service_poll();
+    can_control_service_poll();
     poll_uart_rx();
 
     if (!timebase_tick_ready()) {

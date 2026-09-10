@@ -2,6 +2,7 @@
 #define APPLICATION_SAFETY_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 /* Motor outputs are forced disabled in BOOT/DISABLED/ARMING/FAULT/
  * EMERGENCY_STOP; only READY/ACTIVE/DEGRADED allow motor_control to drive
@@ -34,6 +35,14 @@ void safety_notify_command_received(void);
  * disabled and never auto-arms or restores a previous command -- this must
  * be called deliberately (e.g. from a UART command) to begin arming. */
 void safety_request_arm(void);
+
+/* Explicitly returns an armed/arming node to DISABLED and zeros all motor
+ * outputs. It does not clear FAULT or EMERGENCY_STOP latches. */
+void safety_request_disarm(void);
+
+/* Bits 0/1/2 select front/center/rear. Non-selected motor drivers remain
+ * disabled even while the node is armed. */
+void safety_set_motor_enable_mask(uint8_t mask);
 
 void safety_request_emergency_stop(void);
 

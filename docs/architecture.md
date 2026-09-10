@@ -74,11 +74,12 @@ See [`firmware-update.md`](firmware-update.md).
 
 ## Control authority
 
-Only the ESP32 may publish the final `VehicleMotion` (`0x100`) and
-`SystemEnable` (`0x110`) frames consumed by the motor nodes. A future Raspberry
-Pi autonomy service sends requests to ESP32 over an authenticated Wi-Fi/IP
-protocol, never directly to CAN. This keeps Raspberry Pi outside the critical
-motor bus and prevents competing final command producers.
+Only the ESP32 may publish the final `WheelTargetsLeft` (`0x102`),
+`WheelTargetsRight` (`0x103`), and `SystemEnable` (`0x110`) frames consumed by
+the motor nodes. A future Raspberry Pi autonomy service sends requests to
+ESP32 over an authenticated Wi-Fi/IP protocol, never directly to CAN. This
+keeps Raspberry Pi outside the critical motor bus and prevents competing final
+command producers.
 
 | Selected mode | Accepted source | Failure behavior |
 | --- | --- | --- |
@@ -153,12 +154,21 @@ implemented and host-tested, but not yet validated on assembled hardware. The
 checked-in CubeMX project contains the final FDCAN1, TIM8, common-enable, and
 six direct current-sense ADC configuration.
 
-The application-side FDCAN code currently owns only the update-entry filter.
-The normal STM32 motion-command and telemetry dispatcher, ESP32 CRSF parsing,
-ESP32 arbitration/TWAI transport, Pi camera streaming, and the future ESP32-to-
-Pi Wi-Fi protocol remain separate milestones. Until those transports are
-finished and hardware-tested, USART2 remains the motor-node bench command
-interface.
+The manual command path is implemented and build-tested: ESP32 decodes XR4
+CRSF, enforces explicit arm/ESTOP/link-loss rules, mixes throttle and steering,
+and publishes final CAN commands; both STM32 applications filter and decode
+those commands, select their left/right target, and enforce the local 300 ms
+command timeout. It has not yet been validated with powered motors. STM32
+telemetry, Pi camera streaming, AUTO mode, and the ESP32-to-Pi Wi-Fi protocol
+remain separate milestones. USART2 remains available for motor-node bench
+commands.
+
+The two Classic-CAN wheel-target frames carry six independent signed RPM
+values and a three-bit enable mask for each side. The current radio mixer gives
+engaged wheels on the same side the same skid-steer target, while CH3 selects
+rear-only 2WD, middle-plus-rear 4WD, or all-wheel 6WD. The protocol and STM32
+dispatcher can accept different targets for every wheel when a future control
+algorithm needs them.
 
 Each STM32 samples its six R_IS/L_IS signals directly: five ADC2 ranks and one
 ADC1 channel. No external analog multiplexer is used.

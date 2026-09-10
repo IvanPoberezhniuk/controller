@@ -10,7 +10,7 @@
  * the same message IDs and DLCs as UGV_CAN_MESSAGE_TABLE.
  */
 
-#define UGV_CAN_PROTOCOL_VERSION_MAJOR 2u
+#define UGV_CAN_PROTOCOL_VERSION_MAJOR 3u
 #define UGV_CAN_PROTOCOL_VERSION_MINOR 0u
 
 #define UGV_CAN_BITRATE_BPS             500000u
@@ -32,6 +32,8 @@ typedef enum {
 #define UGV_CAN_MESSAGE_TABLE(X) \
     X(VEHICLE_MOTION,  VehicleMotion,  0x100, 8u) \
     X(AUTO_MOTION_REQUEST, AutoMotionRequest, 0x101, 8u) \
+    X(WHEEL_TARGETS_LEFT, WheelTargetsLeft, 0x102, 8u) \
+    X(WHEEL_TARGETS_RIGHT, WheelTargetsRight, 0x103, 8u) \
     X(SYSTEM_ENABLE,   SystemEnable,   0x110, 2u) \
     X(AUTO_ENABLE_REQUEST, AutoEnableRequest, 0x111, 2u) \
     X(AUX_LIGHTING,    AuxLighting,    0x120, 4u) \
@@ -57,11 +59,8 @@ enum {
 #undef UGV_CAN_DECLARE_DLC
 };
 
-/*
- * 0x100 ESP32 -> both motor nodes (final command). 0x101 retains the same
- * signed-RPM payload for wire compatibility but is reserved: future Pi AUTO
- * requests reach ESP32 over Wi-Fi/IP. Only the ESP32 may produce 0x100.
- */
+/* Legacy side-level motion payload retained for protocol compatibility.
+ * Operational firmware uses the per-wheel 0x102/0x103 messages below. */
 typedef struct {
     uint8_t sequence;
     uint8_t mode_flags;
@@ -70,6 +69,27 @@ typedef struct {
     uint8_t limit_pct;
     uint8_t reserved;
 } ugv_can_motion_cmd_t;
+
+enum {
+    UGV_CAN_WHEEL_ENABLE_FRONT  = 1u << 0,
+    UGV_CAN_WHEEL_ENABLE_CENTER = 1u << 1,
+    UGV_CAN_WHEEL_ENABLE_REAR   = 1u << 2,
+    UGV_CAN_WHEEL_ENABLE_ALL    = 0x07u,
+};
+
+/*
+ * 0x102/0x103 ESP32 -> matching motor node. Each Classic CAN frame carries
+ * all three independent wheel targets for one side. enabled_mask allows a
+ * zero-RPM wheel to remain deliberately engaged or to have its driver output
+ * disabled, which is required for the 2WD/4WD/6WD selector.
+ */
+typedef struct {
+    uint8_t sequence;
+    uint8_t enabled_mask;
+    int16_t front_rpm;
+    int16_t center_rpm;
+    int16_t rear_rpm;
+} ugv_can_wheel_targets_t;
 
 /*
  * 0x110 ESP32 -> motor nodes (final state). 0x111 retains the same payload

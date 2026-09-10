@@ -37,6 +37,23 @@ try {
         "Tests/can/test_can_codec.c", "shared/can/ugv_can_codec.c"
     )
 
+    Build-And-Run "test_crsf" @(
+        "-std=c11", "-Wall", "-Wextra", "-Werror",
+        "-Ifirmware/esp32/components/ugv_crsf/include",
+        "Tests/esp32/test_crsf.c",
+        "firmware/esp32/components/ugv_crsf/ugv_crsf.c"
+    )
+
+    Build-And-Run "test_manual_control" @(
+        "-std=c11", "-Wall", "-Wextra", "-Werror",
+        "-Ishared/can",
+        "-Ifirmware/esp32/components/ugv_crsf/include",
+        "-Ifirmware/esp32/components/ugv_manual_control/include",
+        "Tests/esp32/test_manual_control.c",
+        "firmware/esp32/components/ugv_crsf/ugv_crsf.c",
+        "firmware/esp32/components/ugv_manual_control/ugv_manual_control.c"
+    )
+
     Build-And-Run "test_fw_update_protocol" @(
         "-std=c11", "-Wall", "-Wextra", "-Werror",
         "-Ishared/can", "-Ishared/update",

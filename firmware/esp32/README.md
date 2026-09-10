@@ -26,5 +26,12 @@ idf.py -C firmware/esp32 set-target esp32s3
 idf.py -C firmware/esp32 build
 ```
 
-See `docs/pinout-esp32.md` before wiring. Peripheral implementations are
-intentionally added one at a time after board/TWAI bring-up.
+The current application reads standard CRSF RC frames from XR4 at 420000 baud,
+applies the arm, emergency-stop, deadband, mixer, and 100 ms link timeout, then
+sends independent left/right `WheelTargets` frames and `SystemEnable` on
+Classic CAN at 500 kbit/s every 20 ms. It starts disarmed and never arms merely
+because CH5 was already high at boot. CH3 selects rear-only 2WD, middle+rear
+4WD, or all-wheel 6WD.
+
+See `docs/pinout-esp32.md` before wiring and
+`docs/manual-radio-control.md` before the first powered test.

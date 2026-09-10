@@ -81,6 +81,36 @@ bool ugv_can_decode_motion_cmd(ugv_can_motion_cmd_t *message,
     return true;
 }
 
+bool ugv_can_encode_wheel_targets(uint8_t *payload, size_t size,
+                                  const ugv_can_wheel_targets_t *message)
+{
+    if (!can_encode(payload, size, message, UGV_CAN_WHEEL_TARGETS_LEFT_DLC) ||
+        (message->enabled_mask & (uint8_t)~UGV_CAN_WHEEL_ENABLE_ALL) != 0u) {
+        return false;
+    }
+    payload[0] = message->sequence;
+    payload[1] = message->enabled_mask;
+    write_i16_le(&payload[2], message->front_rpm);
+    write_i16_le(&payload[4], message->center_rpm);
+    write_i16_le(&payload[6], message->rear_rpm);
+    return true;
+}
+
+bool ugv_can_decode_wheel_targets(ugv_can_wheel_targets_t *message,
+                                  const uint8_t *payload, size_t size)
+{
+    if (!can_decode(message, payload, size, UGV_CAN_WHEEL_TARGETS_LEFT_DLC) ||
+        (payload[1] & (uint8_t)~UGV_CAN_WHEEL_ENABLE_ALL) != 0u) {
+        return false;
+    }
+    message->sequence = payload[0];
+    message->enabled_mask = payload[1];
+    message->front_rpm = read_i16_le(&payload[2]);
+    message->center_rpm = read_i16_le(&payload[4]);
+    message->rear_rpm = read_i16_le(&payload[6]);
+    return true;
+}
+
 bool ugv_can_encode_system_enable(uint8_t *payload, size_t size,
                                   const ugv_can_system_enable_t *message)
 {
