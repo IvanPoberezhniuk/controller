@@ -14,6 +14,37 @@
 extern FDCAN_HandleTypeDef hfdcan1;
 
 static bool s_initialized;
+static uint8_t s_telemetry_sequence;
+
+static bool send_frame(uint16_t identifier, const uint8_t *payload,
+                       uint32_t data_length)
+{
+    if (!s_initialized || payload == NULL ||
+        HAL_FDCAN_GetTxFifoFreeLevel(&hfdcan1) == 0u) {
+        return false;
+    }
+
+    const FDCAN_TxHeaderTypeDef header = {
+        .Identifier = identifier,
+        .IdType = FDCAN_STANDARD_ID,
+        .TxFrameType = FDCAN_DATA_FRAME,
+        .DataLength = data_length,
+        .ErrorStateIndicator = FDCAN_ESI_ACTIVE,
+        .BitRateSwitch = FDCAN_BRS_OFF,
+        .FDFormat = FDCAN_CLASSIC_CAN,
+        .TxEventFifoControl = FDCAN_NO_TX_EVENTS,
+        .MessageMarker = 0u,
+    };
+    return HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &header, payload) == HAL_OK;
+}
+
+static int16_t telemetry_rpm(motor_index_t motor)
+{
+    const float rpm = motor_control_get_state(motor)->measured_rpm;
+    if (rpm > 32767.0f) return INT16_MAX;
+    if (rpm < -32768.0f) return INT16_MIN;
+    return (int16_t)rpm;
+}
 
 static void set_all_targets_zero(void)
 {
@@ -107,6 +138,21 @@ bool can_control_service_init(void)
 
     s_initialized = true;
     return true;
+}
+
+void can_control_service_publish_telemetry(void)
+{
+    uint8_t payload[UGV_CAN_TELEMETRY_LEFT_DLC] = {0};
+    const ugv_can_motor_telemetry_t telemetry = {
+        .sequence = s_telemetry_sequence++,
+        .safety_state = (uint8_t)safety_get_state(),
+        .front_rpm = telemetry_rpm(MOTOR_FRONT),
+        .center_rpm = telemetry_rpm(MOTOR_CENTER),
+        .rear_rpm = telemetry_rpm(MOTOR_REAR),
+    };
+    if (ugv_can_encode_motor_telemetry(payload, sizeof(payload), &telemetry)) {
+        (void)send_frame(UGV_NODE_TELEMETRY_ID, payload, FDCAN_DLC_BYTES_8);
+    }
 }
 
 void can_control_service_poll(void)

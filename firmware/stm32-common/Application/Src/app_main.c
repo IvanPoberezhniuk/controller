@@ -159,6 +159,11 @@ void app_main_run(void)
     watchdog_refresh();
 
     static uint32_t s_telemetry_divider = 0;
+    static uint32_t s_can_telemetry_divider = 0;
+    if (++s_can_telemetry_divider >= (TIMEBASE_CONTROL_LOOP_HZ / 10u)) {
+        s_can_telemetry_divider = 0;
+        can_control_service_publish_telemetry();
+    }
     if (++s_telemetry_divider >= (TIMEBASE_CONTROL_LOOP_HZ / 4u)) {
         s_telemetry_divider = 0;
         print_telemetry();

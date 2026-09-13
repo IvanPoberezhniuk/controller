@@ -35,4 +35,10 @@ float ugv_crsf_channel_normalized(const ugv_crsf_receiver_t *receiver,
                                   unsigned channel,
                                   float deadband);
 
+/* Builds the standard CRSF 0x0C RPM telemetry frame. rpm_source_id is the
+ * index of the first value (0 = M1); up to 19 signed RPM values fit. */
+size_t ugv_crsf_build_rpm_frame(uint8_t *frame, size_t capacity,
+                                uint8_t rpm_source_id,
+                                const int32_t *rpm, size_t count);
+
 #endif /* UGV_CRSF_H */

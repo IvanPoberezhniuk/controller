@@ -6,6 +6,8 @@
 #define CRSF_LENGTH_MAX               62u
 #define CRSF_TYPE_LINK_STATISTICS     0x14u
 #define CRSF_TYPE_RC_CHANNELS_PACKED  0x16u
+#define CRSF_TYPE_RPM_SENSOR          0x0cu
+#define CRSF_SYNC                     0xc8u
 #define CRSF_RC_PAYLOAD_SIZE          22u
 #define CRSF_LINK_STATS_SIZE          10u
 #define CRSF_CHANNEL_CENTER           992u
@@ -63,13 +65,25 @@ ugv_crsf_event_t ugv_crsf_push_byte(ugv_crsf_receiver_t *receiver,
     }
 
     if (receiver->frame_size == 0u) {
+        /* UART can be opened in the middle of a frame and electrical noise can
+         * drop bytes. Only the flight-controller address is a valid start for
+         * the RC/link-statistics stream emitted by the receiver. Scanning for
+         * it lets the parser recover at the next CRSF frame instead of treating
+         * arbitrary payload bytes as a new header. */
+        if (byte != CRSF_SYNC) {
+            return UGV_CRSF_EVENT_NONE;
+        }
         receiver->frame[receiver->frame_size++] = byte;
         return UGV_CRSF_EVENT_NONE;
     }
 
     if (receiver->frame_size == 1u) {
         if (byte < CRSF_LENGTH_MIN || byte > CRSF_LENGTH_MAX) {
-            receiver->frame_size = 0u;
+            /* A second sync byte can itself be the start of the next frame. */
+            receiver->frame_size = byte == CRSF_SYNC ? 1u : 0u;
+            if (receiver->frame_size == 1u) {
+                receiver->frame[0] = byte;
+            }
             receiver->expected_size = 0u;
             return UGV_CRSF_EVENT_NONE;
         }
@@ -154,4 +168,35 @@ float ugv_crsf_channel_normalized(const ugv_crsf_receiver_t *receiver,
     }
     const float scaled = (magnitude - deadband) / (1.0f - deadband);
     return value < 0.0f ? -scaled : scaled;
+}
+
+size_t ugv_crsf_build_rpm_frame(uint8_t *frame, size_t capacity,
+                                uint8_t rpm_source_id,
+                                const int32_t *rpm, size_t count)
+{
+    if (frame == NULL || rpm == NULL || count == 0u || count > 19u) {
+        return 0u;
+    }
+    const size_t payload_size = 1u + (count * 3u);
+    const size_t frame_size = payload_size + 4u;
+    if (capacity < frame_size) {
+        return 0u;
+    }
+
+    frame[0] = CRSF_SYNC;
+    frame[1] = (uint8_t)(payload_size + 2u); /* type + payload + CRC */
+    frame[2] = CRSF_TYPE_RPM_SENSOR;
+    frame[3] = rpm_source_id;
+    for (size_t i = 0; i < count; ++i) {
+        int32_t value = rpm[i];
+        if (value > 0x7fffff) value = 0x7fffff;
+        if (value < -0x800000) value = -0x800000;
+        const uint32_t encoded = (uint32_t)value & 0x00ffffffu;
+        const size_t offset = 4u + (i * 3u);
+        frame[offset] = (uint8_t)(encoded >> 16u);
+        frame[offset + 1u] = (uint8_t)(encoded >> 8u);
+        frame[offset + 2u] = (uint8_t)encoded;
+    }
+    frame[frame_size - 1u] = crc8_dvb_s2(&frame[2], payload_size + 1u);
+    return frame_size;
 }

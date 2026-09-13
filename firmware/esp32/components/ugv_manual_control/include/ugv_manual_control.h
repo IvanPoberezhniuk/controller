@@ -28,7 +28,8 @@ typedef struct {
     float steering;
     float throttle;
     uint8_t drive_mode;
-    uint8_t wheel_enable_mask;
+    uint8_t left_enable_mask;
+    uint8_t right_enable_mask;
     int16_t left_rpm[3];
     int16_t right_rpm[3];
 } ugv_manual_control_t;

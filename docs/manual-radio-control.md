@@ -39,6 +39,12 @@ The firmware matches the default `connectionApp/config.json` mapping:
 | CH5 | ARM | low = disarm; low-to-high edge = arm |
 | CH6 | ESTOP | high latches emergency stop |
 
+Each STM32 publishes its three measured encoder speeds on CAN at 10 Hz. ESP32
+forwards alternating left/right groups as standard CRSF `0x0C` RPM telemetry,
+which the connection application displays per motor. There is no per-motor
+voltage measurement in the current wiring. BTS7960 current-sense values also
+remain unavailable until their analog scaling has been physically calibrated.
+
 The ESP32 accepts standard `RC_CHANNELS_PACKED` CRSF frames at 420000 baud.
 Its skid-steer mixer matches the application's display:
 
@@ -61,7 +67,7 @@ physical power disconnect.
 
 1. Keep ARM off, ESTOP off, and throttle/steering centered.
 2. Power the 3.3 V logic rail, XR4 supply, and CAN nodes.
-3. Start `connectionApp`, connect it to the ELRS TX module at 420000 baud, and
+3. Start `connectionApp`, connect it to the Nomad built-in USB-UART at 400000 baud, and
    confirm that it is sending about 50 packets/s.
 4. Turn on the radio link and verify the ESP32 serial log reports `RC=UP`,
    `ARM=OFF`, and reasonable CH1/CH2 values near 992 at center.

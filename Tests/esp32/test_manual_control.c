@@ -49,7 +49,8 @@ static void test_explicit_neutral_arm_and_mixer(void)
     set_channel(&radio, UGV_RC_THROTTLE_CHANNEL, CRSF_MAX);
     fresh_update(&control, &radio, 3u);
     assert(control.drive_mode == 3u);
-    assert(control.wheel_enable_mask == UGV_CAN_WHEEL_ENABLE_ALL);
+    assert(control.left_enable_mask == UGV_CAN_WHEEL_ENABLE_ALL);
+    assert(control.right_enable_mask == UGV_CAN_WHEEL_ENABLE_ALL);
     for (unsigned wheel = 0; wheel < 3u; ++wheel) {
         assert(control.left_rpm[wheel] == 200);
         assert(control.right_rpm[wheel] == 200);
@@ -81,14 +82,17 @@ static void test_drive_modes_control_each_wheel(void)
     set_channel(&radio, UGV_RC_DRIVE_MODE_CHANNEL, CRSF_MIN);
     fresh_update(&control, &radio, 2u);
     assert(control.drive_mode == 1u);
-    assert(control.wheel_enable_mask == UGV_CAN_WHEEL_ENABLE_REAR);
+    assert(control.left_enable_mask == UGV_CAN_WHEEL_ENABLE_REAR);
+    assert(control.right_enable_mask == UGV_CAN_WHEEL_ENABLE_REAR);
     assert(control.left_rpm[0] == 0 && control.left_rpm[1] == 0 &&
            control.left_rpm[2] == 200);
 
     set_channel(&radio, UGV_RC_DRIVE_MODE_CHANNEL, CRSF_CENTER);
     fresh_update(&control, &radio, 3u);
     assert(control.drive_mode == 2u);
-    assert(control.wheel_enable_mask ==
+    assert(control.left_enable_mask ==
+           (UGV_CAN_WHEEL_ENABLE_CENTER | UGV_CAN_WHEEL_ENABLE_REAR));
+    assert(control.right_enable_mask ==
            (UGV_CAN_WHEEL_ENABLE_CENTER | UGV_CAN_WHEEL_ENABLE_REAR));
     assert(control.right_rpm[0] == 0 && control.right_rpm[1] == 200 &&
            control.right_rpm[2] == 200);
@@ -96,7 +100,8 @@ static void test_drive_modes_control_each_wheel(void)
     set_channel(&radio, UGV_RC_DRIVE_MODE_CHANNEL, CRSF_MAX);
     fresh_update(&control, &radio, 4u);
     assert(control.drive_mode == 3u);
-    assert(control.wheel_enable_mask == UGV_CAN_WHEEL_ENABLE_ALL);
+    assert(control.left_enable_mask == UGV_CAN_WHEEL_ENABLE_ALL);
+    assert(control.right_enable_mask == UGV_CAN_WHEEL_ENABLE_ALL);
 }
 
 static void test_failsafe_requires_rearm(void)
@@ -115,7 +120,8 @@ static void test_failsafe_requires_rearm(void)
     ugv_manual_control_update(&control, &radio, 112u);
     assert(!control.link_up);
     assert(!control.armed);
-    assert(control.wheel_enable_mask == 0u);
+    assert(control.left_enable_mask == 0u);
+    assert(control.right_enable_mask == 0u);
     for (unsigned wheel = 0; wheel < 3u; ++wheel) {
         assert(control.left_rpm[wheel] == 0);
         assert(control.right_rpm[wheel] == 0);

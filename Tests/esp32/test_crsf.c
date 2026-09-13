@@ -63,6 +63,11 @@ static void test_channels_and_normalization(void)
     pack_channels(&frame[3], channels);
     frame[25] = crc8_dvb_s2(&frame[2], 23u);
 
+    const uint8_t leading_noise[] = {0x01u, 24u, 0x16u, 0xaau, 0x55u};
+    assert(feed(&receiver, leading_noise, sizeof(leading_noise)) ==
+           UGV_CRSF_EVENT_NONE);
+    assert(receiver.crc_error_count == 0u);
+
     assert(feed(&receiver, frame, sizeof(frame)) == UGV_CRSF_EVENT_CHANNELS);
     assert(receiver.channel_frame_count == 1u);
     assert(receiver.channels[0] == 172u);
@@ -76,6 +81,10 @@ static void test_channels_and_normalization(void)
     assert(feed(&receiver, frame, sizeof(frame)) == UGV_CRSF_EVENT_NONE);
     assert(receiver.channel_frame_count == 1u);
     assert(receiver.crc_error_count == 1u);
+
+    frame[25] ^= 1u;
+    assert(feed(&receiver, frame, sizeof(frame)) == UGV_CRSF_EVENT_CHANNELS);
+    assert(receiver.channel_frame_count == 2u);
 }
 
 static void test_link_statistics(void)
@@ -97,10 +106,29 @@ static void test_link_statistics(void)
     assert(receiver.rssi_dbm == -45);
 }
 
+static void test_rpm_telemetry_frame(void)
+{
+    const int32_t rpm[3] = {333, -120, 0};
+    uint8_t frame[16] = {0};
+    const size_t size = ugv_crsf_build_rpm_frame(frame, sizeof(frame),
+                                                  3u, rpm, 3u);
+    assert(size == 14u);
+    assert(frame[0] == 0xc8u);
+    assert(frame[1] == 12u);
+    assert(frame[2] == 0x0cu);
+    assert(frame[3] == 3u);
+    assert(frame[4] == 0x00u && frame[5] == 0x01u && frame[6] == 0x4du);
+    assert(frame[7] == 0xffu && frame[8] == 0xffu && frame[9] == 0x88u);
+    assert(frame[10] == 0u && frame[11] == 0u && frame[12] == 0u);
+    assert(frame[13] == crc8_dvb_s2(&frame[2], 11u));
+    assert(ugv_crsf_build_rpm_frame(frame, 5u, 0u, rpm, 3u) == 0u);
+}
+
 int main(void)
 {
     test_channels_and_normalization();
     test_link_statistics();
+    test_rpm_telemetry_frame();
     puts("all CRSF tests passed");
     return 0;
 }

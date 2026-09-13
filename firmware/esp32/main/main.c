@@ -9,6 +9,7 @@
 #include "esp_twai.h"
 #include "esp_twai_onchip.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "freertos/task.h"
 
 #include "ugv_can_codec.h"
@@ -26,10 +27,56 @@ static bool s_twai_recovering;
 static twai_frame_t s_twai_tx_frame;
 static uint8_t s_twai_tx_payload[8];
 static bool s_twai_tx_pending;
+static QueueHandle_t s_can_rx_queue;
+
+typedef struct {
+    uint32_t identifier;
+    uint8_t size;
+    uint8_t payload[8];
+} can_rx_message_t;
+
+typedef struct {
+    int32_t rpm[6];
+    uint32_t received_ms[2];
+    bool side_seen[2];
+} motor_telemetry_t;
 
 #define RC_UART                 UART_NUM_1
 #define CONTROL_PERIOD_MS       20u
 #define STATUS_LOG_PERIOD_MS    1000u
+#define RPM_RADIO_PERIOD_MS     200u
+
+static bool IRAM_ATTR can_rx_done(twai_node_handle_t node,
+                                  const twai_rx_done_event_data_t *event,
+                                  void *user_context)
+{
+    (void)event;
+    (void)user_context;
+    uint8_t payload[8] = {0};
+    twai_frame_t frame = {
+        .buffer = payload,
+        .buffer_len = sizeof(payload),
+    };
+    if (twai_node_receive_from_isr(node, &frame) != ESP_OK ||
+        frame.header.ide || frame.header.rtr || frame.header.fdf) {
+        return false;
+    }
+
+    can_rx_message_t message = {
+        .identifier = frame.header.id,
+        .size = (uint8_t)twaifd_dlc2len(frame.header.dlc),
+    };
+    if (message.size > sizeof(message.payload)) {
+        return false;
+    }
+    for (unsigned i = 0; i < message.size; ++i) {
+        message.payload[i] = payload[i];
+    }
+
+    BaseType_t task_woken = pdFALSE;
+    (void)xQueueSendFromISR(s_can_rx_queue, &message, &task_woken);
+    return task_woken == pdTRUE;
+}
 
 static uint32_t now_ms(void)
 {
@@ -71,9 +118,60 @@ static esp_err_t can_init(const ugv_esp32_board_config_t *board)
         .tx_queue_depth = 8u,
     };
 
+    s_can_rx_queue = xQueueCreate(16u, sizeof(can_rx_message_t));
+    ESP_RETURN_ON_FALSE(s_can_rx_queue != NULL, ESP_ERR_NO_MEM, TAG,
+                        "TWAI RX queue allocation failed");
     ESP_RETURN_ON_ERROR(twai_new_node_onchip(&config, &s_twai_node), TAG,
                         "TWAI node creation failed");
+    const twai_event_callbacks_t callbacks = {
+        .on_rx_done = can_rx_done,
+    };
+    ESP_RETURN_ON_ERROR(twai_node_register_event_callbacks(
+                            s_twai_node, &callbacks, NULL),
+                        TAG, "TWAI callback registration failed");
     return twai_node_enable(s_twai_node);
+}
+
+static void process_can_telemetry(motor_telemetry_t *telemetry,
+                                  uint32_t current_ms)
+{
+    can_rx_message_t message;
+    while (xQueueReceive(s_can_rx_queue, &message, 0) == pdTRUE) {
+        unsigned side;
+        if (message.identifier == UGV_CAN_MSG_TELEMETRY_LEFT) {
+            side = 0u;
+        } else if (message.identifier == UGV_CAN_MSG_TELEMETRY_RIGHT) {
+            side = 1u;
+        } else {
+            continue;
+        }
+
+        ugv_can_motor_telemetry_t decoded;
+        if (!ugv_can_decode_motor_telemetry(&decoded, message.payload,
+                                            message.size)) {
+            continue;
+        }
+        const unsigned offset = side * 3u;
+        telemetry->rpm[offset] = decoded.front_rpm;
+        telemetry->rpm[offset + 1u] = decoded.center_rpm;
+        telemetry->rpm[offset + 2u] = decoded.rear_rpm;
+        telemetry->received_ms[side] = current_ms;
+        telemetry->side_seen[side] = true;
+    }
+}
+
+static bool radio_send_rpm_side(const motor_telemetry_t *telemetry,
+                                unsigned side, uint32_t current_ms)
+{
+    if (side > 1u || !telemetry->side_seen[side] ||
+        (current_ms - telemetry->received_ms[side]) > 500u) {
+        return false;
+    }
+    uint8_t frame[16] = {0};
+    const unsigned offset = side * 3u;
+    const size_t size = ugv_crsf_build_rpm_frame(
+        frame, sizeof(frame), (uint8_t)offset, &telemetry->rpm[offset], 3u);
+    return size > 0u && uart_write_bytes(RC_UART, frame, size) == (int)size;
 }
 
 static bool can_send(uint16_t identifier, const uint8_t *payload, uint8_t size)
@@ -128,19 +226,16 @@ static bool send_control_frames(const ugv_manual_control_t *control,
 {
     uint8_t payload[8] = {0};
     const uint8_t current_sequence = (*sequence)++;
-    const uint8_t enabled_mask = control->armed
-                                     ? control->wheel_enable_mask
-                                     : 0u;
     const ugv_can_wheel_targets_t left = {
         .sequence = current_sequence,
-        .enabled_mask = enabled_mask,
+        .enabled_mask = control->armed ? control->left_enable_mask : 0u,
         .front_rpm = control->armed ? control->left_rpm[0] : 0,
         .center_rpm = control->armed ? control->left_rpm[1] : 0,
         .rear_rpm = control->armed ? control->left_rpm[2] : 0,
     };
     const ugv_can_wheel_targets_t right = {
         .sequence = current_sequence,
-        .enabled_mask = enabled_mask,
+        .enabled_mask = control->armed ? control->right_enable_mask : 0u,
         .front_rpm = control->armed ? control->right_rpm[0] : 0,
         .center_rpm = control->armed ? control->right_rpm[1] : 0,
         .rear_rpm = control->armed ? control->right_rpm[2] : 0,
@@ -169,7 +264,7 @@ void app_main(void)
 {
     const ugv_esp32_board_config_t *board = ugv_esp32_board_config();
     ESP_LOGI(TAG, "UGV manual control booting");
-    ESP_LOGI(TAG, "CRSF CH1=steering CH2=throttle CH3=2/4/6WD CH5=arm CH6=estop, max=%.0f RPM",
+    ESP_LOGI(TAG, "CRSF manual drive mode, max=%.0f RPM",
              (double)UGV_RC_MAX_RPM);
     ESP_LOGI(TAG, "TWAI TX=%d RX=%d at %u bit/s",
              board->can_tx, board->can_rx, UGV_CAN_BITRATE_BPS);
@@ -187,12 +282,16 @@ void app_main(void)
     uint32_t last_control_ms = 0u;
     uint32_t last_log_ms = 0u;
     uint32_t can_tx_errors = 0u;
+    uint32_t last_rpm_radio_ms = 0u;
+    unsigned rpm_radio_side = 0u;
+    motor_telemetry_t telemetry = {0};
     uint8_t rx[128];
 
     while (true) {
         const int received = uart_read_bytes(RC_UART, rx, sizeof(rx),
                                              pdMS_TO_TICKS(2));
         const uint32_t current_ms = now_ms();
+        process_can_telemetry(&telemetry, current_ms);
         for (int i = 0; i < received; ++i) {
             const ugv_crsf_event_t event = ugv_crsf_push_byte(&radio, rx[i]);
             if ((event & UGV_CRSF_EVENT_CHANNELS) != 0u) {
@@ -217,10 +316,16 @@ void app_main(void)
             }
         }
 
+        if ((current_ms - last_rpm_radio_ms) >= RPM_RADIO_PERIOD_MS) {
+            last_rpm_radio_ms = current_ms;
+            (void)radio_send_rpm_side(&telemetry, rpm_radio_side, current_ms);
+            rpm_radio_side ^= 1u;
+        }
+
         if ((current_ms - last_log_ms) >= STATUS_LOG_PERIOD_MS) {
             last_log_ms = current_ms;
             ESP_LOGI(TAG,
-                     "RC=%s ARM=%s ESTOP=%s MODE=%u CH1=%u CH2=%u CH3=%u CH5=%u CH6=%u steer=%.2f throttle=%.2f L=%d/%d/%d R=%d/%d/%d LQ=%u CANerr=%lu CRCerr=%lu",
+                     "RC=%s ARM=%s ESTOP=%s MODE=DRIVE/%u CH1=%u CH2=%u CH3=%u CH5=%u CH6=%u steer=%.2f throttle=%.2f L=%d/%d/%d(%02x) R=%d/%d/%d(%02x) LQ=%u CANerr=%lu CRCerr=%lu",
                      control.link_up ? "OK" : "LOST",
                      control.armed ? "ON" : "OFF",
                      control.emergency_stop_latched ? "ON" : "OFF",
@@ -232,8 +337,9 @@ void app_main(void)
                      radio.channels[UGV_RC_ESTOP_CHANNEL],
                      (double)control.steering, (double)control.throttle,
                      control.left_rpm[0], control.left_rpm[1],
-                     control.left_rpm[2], control.right_rpm[0],
-                     control.right_rpm[1], control.right_rpm[2],
+                     control.left_rpm[2], control.left_enable_mask,
+                     control.right_rpm[0], control.right_rpm[1],
+                     control.right_rpm[2], control.right_enable_mask,
                      radio.link_quality_pct, (unsigned long)can_tx_errors,
                      (unsigned long)radio.crc_error_count);
         }

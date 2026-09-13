@@ -27,16 +27,17 @@ static void mix_drive(ugv_manual_control_t *control)
     const int16_t left_rpm = (int16_t)(left * UGV_RC_MAX_RPM);
     const int16_t right_rpm = (int16_t)(right * UGV_RC_MAX_RPM);
 
-    control->wheel_enable_mask = UGV_CAN_WHEEL_ENABLE_REAR;
+    control->left_enable_mask = UGV_CAN_WHEEL_ENABLE_REAR;
     if (control->drive_mode >= 2u) {
-        control->wheel_enable_mask |= UGV_CAN_WHEEL_ENABLE_CENTER;
+        control->left_enable_mask |= UGV_CAN_WHEEL_ENABLE_CENTER;
     }
     if (control->drive_mode >= 3u) {
-        control->wheel_enable_mask |= UGV_CAN_WHEEL_ENABLE_FRONT;
+        control->left_enable_mask |= UGV_CAN_WHEEL_ENABLE_FRONT;
     }
+    control->right_enable_mask = control->left_enable_mask;
 
     for (unsigned wheel = 0; wheel < 3u; ++wheel) {
-        const bool enabled = (control->wheel_enable_mask & (1u << wheel)) != 0u;
+        const bool enabled = (control->left_enable_mask & (1u << wheel)) != 0u;
         control->left_rpm[wheel] = enabled ? left_rpm : 0;
         control->right_rpm[wheel] = enabled ? right_rpm : 0;
     }
@@ -44,7 +45,8 @@ static void mix_drive(ugv_manual_control_t *control)
 
 static void stop_all_wheels(ugv_manual_control_t *control)
 {
-    control->wheel_enable_mask = 0u;
+    control->left_enable_mask = 0u;
+    control->right_enable_mask = 0u;
     memset(control->left_rpm, 0, sizeof(control->left_rpm));
     memset(control->right_rpm, 0, sizeof(control->right_rpm));
 }
@@ -107,6 +109,7 @@ void ugv_manual_control_update(ugv_manual_control_t *control,
         radio, UGV_RC_DRIVE_MODE_CHANNEL, 0.0f);
     control->drive_mode = drive_mode < -0.5f ? 1u :
                           drive_mode > 0.5f ? 3u : 2u;
+
     const float arm = ugv_crsf_channel_normalized(
         radio, UGV_RC_ARM_CHANNEL, 0.0f);
     const bool arm_low = arm < RC_ARM_LOW_THRESHOLD;
