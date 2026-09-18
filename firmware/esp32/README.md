@@ -1,37 +1,26 @@
-# UGV ESP32 auxiliary node
+# UGV ESP32 control/AUX node
 
-Independent ESP-IDF project for the Sixspan ESP32-S3-N16R8 (16 MB flash,
-8 MB octal PSRAM). This project is new; `F:\work\academy\blinkESP32` remains
-an untouched reference only.
+ESP-IDF project for the Sixspan ESP32-S3-N16R8. It reads full-duplex CRSF
+from RadioMaster XR4 at 420000 baud and owns two private 115200-baud UART links:
 
-Responsibilities:
+- UART0: Left STM32, GPIO39 TX / GPIO40 RX;
+- UART2: Right STM32, GPIO41 TX / GPIO42 RX;
+- UART1: XR4, GPIO38 TX / GPIO21 RX.
 
-- Classic CAN/TWAI link through an external 3.3 V CAN transceiver;
-- RadioMaster XR4 receiver over full-duplex CRSF at 420000 baud;
-- SH1106 128x64 OLED and rotary encoder UI;
-- QMI8658A six-axis IMU, HGLRC M100-5883 GPS/compass, and a future
-  ambient-light sensor;
-- vehicle lighting and a local warning buzzer;
-- future Wi-Fi/IP link to Raspberry Pi for autonomy requests and relayed
-  telemetry.
-
-Full audio and the camera remain Raspberry Pi responsibilities. Raspberry Pi
-is deliberately absent from the CAN trunk: ESP32 is the only runtime gateway
-between non-motor command sources and the STM32 motor nodes.
+The application applies ARM, ESTOP, deadband, drive-mode, mixing, and 100 ms
+radio timeout rules, then sends role-addressed CRC-protected commands every
+20 ms. It receives RPM telemetry from both STM32 nodes and relays it to XR4.
+It also relays a versioned `UGV` diagnostic frame once per second for
+ConnectionApp, including RF/ARM state and health counters for both UART links.
+CAN/TWAI is not used.
 
 Build from an initialized ESP-IDF shell:
 
 ```powershell
-idf.py -C firmware/esp32 set-target esp32s3
+. C:\esp\v6.0.2\esp-idf\export.ps1
 idf.py -C firmware/esp32 build
 ```
 
-The current application reads standard CRSF RC frames from XR4 at 420000 baud,
-applies the arm, emergency-stop, deadband, mixer, and 100 ms link timeout, then
-sends independent left/right `WheelTargets` frames and `SystemEnable` on
-Classic CAN at 500 kbit/s every 20 ms. It starts disarmed and never arms merely
-because CH5 was already high at boot. CH3 selects rear-only 2WD, middle+rear
-4WD, or all-wheel 6WD.
-
-See `docs/pinout-esp32.md` before wiring and
-`docs/manual-radio-control.md` before the first powered test.
+UART0 application console output is disabled because UART0 carries the Left
+motor protocol at runtime. The ROM USB-UART flashing path on GPIO43/GPIO44 is
+unchanged. See `docs/pinout-esp32.md` and `docs/manual-radio-control.md`.

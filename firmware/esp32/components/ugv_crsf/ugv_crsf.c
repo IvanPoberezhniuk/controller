@@ -27,6 +27,37 @@ static uint8_t crc8_dvb_s2(const uint8_t *data, size_t size)
     return crc;
 }
 
+static void put_u16_le(uint8_t *output, uint16_t value)
+{
+    output[0] = (uint8_t)value;
+    output[1] = (uint8_t)(value >> 8u);
+}
+
+static void put_u32_le(uint8_t *output, uint32_t value)
+{
+    output[0] = (uint8_t)value;
+    output[1] = (uint8_t)(value >> 8u);
+    output[2] = (uint8_t)(value >> 16u);
+    output[3] = (uint8_t)(value >> 24u);
+}
+
+static void encode_link_diagnostic(
+    uint8_t *output, const ugv_crsf_link_diagnostic_t *diagnostic)
+{
+    put_u32_le(&output[0], diagnostic->control_tx_count);
+    put_u16_le(&output[4], diagnostic->control_tx_fail_count);
+    put_u32_le(&output[6], diagnostic->telemetry_rx_count);
+    put_u16_le(&output[10], diagnostic->telemetry_age_ms);
+    put_u16_le(&output[12], diagnostic->uart_crc_error_count);
+    put_u16_le(&output[14], diagnostic->uart_format_error_count);
+    output[16] = diagnostic->safety_state;
+    output[17] = diagnostic->fault_mask;
+    output[18] = diagnostic->valid_mask;
+    output[19] = (uint8_t)diagnostic->control_rx_count;
+    output[20] = diagnostic->last_control_flags;
+    output[21] = diagnostic->last_enabled_mask;
+}
+
 static void decode_channels(ugv_crsf_receiver_t *receiver,
                             const uint8_t *payload)
 {
@@ -198,5 +229,34 @@ size_t ugv_crsf_build_rpm_frame(uint8_t *frame, size_t capacity,
         frame[offset + 2u] = (uint8_t)encoded;
     }
     frame[frame_size - 1u] = crc8_dvb_s2(&frame[2], payload_size + 1u);
+    return frame_size;
+}
+
+size_t ugv_crsf_build_diagnostic_frame(
+    uint8_t *frame, size_t capacity, const ugv_crsf_diagnostic_t *diagnostic)
+{
+    const size_t frame_size = UGV_CRSF_DIAGNOSTIC_PAYLOAD_SIZE + 4u;
+    if (frame == NULL || diagnostic == NULL || capacity < frame_size) {
+        return 0u;
+    }
+
+    frame[0] = CRSF_SYNC;
+    frame[1] = UGV_CRSF_DIAGNOSTIC_PAYLOAD_SIZE + 2u;
+    frame[2] = UGV_CRSF_DIAGNOSTIC_FRAME_TYPE;
+    uint8_t *payload = &frame[3];
+    payload[0] = 'U';
+    payload[1] = 'G';
+    payload[2] = 'V';
+    payload[3] = UGV_CRSF_DIAGNOSTIC_VERSION;
+    payload[4] = diagnostic->flags;
+    payload[5] = diagnostic->drive_mode;
+    put_u16_le(&payload[6], (uint16_t)diagnostic->throttle_per_mille);
+    put_u16_le(&payload[8], (uint16_t)diagnostic->steering_per_mille);
+    put_u32_le(&payload[10], diagnostic->crsf_channel_frame_count);
+    put_u16_le(&payload[14], diagnostic->crsf_crc_error_count);
+    encode_link_diagnostic(&payload[16], &diagnostic->left);
+    encode_link_diagnostic(&payload[38], &diagnostic->right);
+    frame[frame_size - 1u] = crc8_dvb_s2(
+        &frame[2], UGV_CRSF_DIAGNOSTIC_PAYLOAD_SIZE + 1u);
     return frame_size;
 }

@@ -7,7 +7,7 @@
 **  Author		: STM32CubeMX
 **
 **  Abstract    : Linker script for STM32G431CBTx series
-**                application region behind the UGV CAN bootloader
+**                application region behind the UGV UART bootloader
 **
 **                Set heap size, stack size and stack location according
 **                to application requirements.

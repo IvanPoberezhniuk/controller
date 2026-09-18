@@ -1,130 +1,101 @@
 # UGV controller monorepo
 
-Firmware and protocol definitions for the 6x6 UGV. The vehicle has two
-STM32G431CBT6 motor-control nodes, one ESP32-S3 control/AUX node, and a
-Raspberry Pi 5 as the high-level computer.
+Firmware and protocol definitions for a 6×6 UGV with two STM32G431 motor
+nodes, one ESP32-S3 control/AUX node, and a Raspberry Pi 5 high-level computer.
 
-## Nodes
+## Runtime architecture
 
 | Node | Responsibilities |
 | --- | --- |
-| STM32 Left | Front-left, center-left, rear-left motors; encoders; six R_IS/L_IS signals |
-| STM32 Right | Front-right, center-right, rear-right motors; encoders; six R_IS/L_IS signals |
-| ESP32 control/AUX | XR4 CRSF receiver, MANUAL/AUTO arbitration, final CAN commands, OLED, encoder UI, QMI8658A IMU, M100-5883 GPS/compass, ambient light, lighting, buzzer |
-| Raspberry Pi 5 | Wi-Fi camera/video, full audio, navigation, networking and logging; no direct CAN connection |
+| STM32 Left | Three left motors, encoders, current sensing, PID and local safety |
+| STM32 Right | Three right motors, encoders, current sensing, PID and local safety |
+| ESP32 | XR4/CRSF input, arming, skid-steer mixing, two motor UARTs and AUX peripherals |
+| Raspberry Pi 5 | Camera, audio, networking, logging and future navigation |
 
-Each STM32 reads its six local R_IS/L_IS signals directly through ADC1/ADC2.
-Both STM32 targets compile the same motor firmware and select only their
-role-specific configuration at build time.
-The runtime CAN trunk contains only ESP32 and the two STM32 nodes. Raspberry Pi
-communicates over Wi-Fi/IP and is not part of the manual-control or motor-safety
-path.
+ESP32 talks directly to each STM32 over a private 3.3 V full-duplex UART at
+115200 baud. CAN is not used: SN65HVD230 modules, CAN-H/CAN-L, and termination
+resistors are removed. See [architecture](docs/architecture.md),
+[wiring](docs/wiring.md), and [UART protocol](docs/uart-protocol.md).
 
 ## Repository layout
 
 ```text
 firmware/
-  stm32-common/  shared CubeMX/HAL and motor-control implementation
-  stm32-bootloader/ role-specific FDCAN recovery bootloader
-  stm32-left/    left node identity and calibration signs
-  stm32-right/   right node identity and calibration signs
-  esp32/         independent ESP-IDF project for Sixspan ESP32-S3-N16R8
-shared/can/      protocol IDs, payload types, explicit codec and DBC
-shared/update/   OTA protocol, CRC, metadata and flash layout
-Tests/           host-side STM32 math and CAN codec tests
-docs/            architecture, wiring, pinouts and CubeMX notes
-tools/           build, flash and serial-console PowerShell scripts
-CLAUDE.md         versioned engineering/agent instructions and decision index
-.claude/skills/   subsystem decision records and unresolved hardware choices
+  stm32-common/  shared CubeMX/HAL motor-node application
+  stm32-left/    left role and direction configuration
+  stm32-right/   right role and direction configuration
+  esp32/         ESP-IDF control/AUX application
+  stm32-bootloader/ legacy CAN bootloader source, not in active runtime
+shared/serial/   active framed UART protocol and CRC
+shared/can/      legacy CAN protocol retained for history/tests
+shared/update/   legacy CAN update protocol retained for history/tests
+Tests/           host-side protocol, motor, radio and safety tests
+docs/            architecture, wiring, pinouts and build notes
+tools/           build, flash and test PowerShell scripts
 ```
 
-`F:\work\academy\blinkESP32` is not part of this repository and remains an
-untouched reference for the proven SH1106 OLED setup.
-
-## STM32 builds
+## Build and test
 
 From the repository root:
 
 ```powershell
+.\tools\build-all.ps1 -SkipEsp32
+.\tools\test-host.ps1
+```
+
+Or build STM32 targets separately:
+
+```powershell
+. .\tools\stm32-env.ps1
 cmake --preset stm32-left-debug
 cmake --build --preset stm32-left-debug
-
 cmake --preset stm32-right-debug
 cmake --build --preset stm32-right-debug
 ```
 
-Images are written to:
+Outputs:
 
-- `build/stm32-left-debug/UGV_STM32_LEFT.elf`
-- `build/stm32-right-debug/UGV_STM32_RIGHT.elf`
+- `build/stm32-left-debug/UGV_STM32_LEFT.bin`
+- `build/stm32-right-debug/UGV_STM32_RIGHT.bin`
 
-The `flash-left.ps1` / `flash-right.ps1` scripts are legacy SWD bench flashing
-for standalone images. They are not used by the CAN OTA flow.
-
-## STM32 bootloader and CAN update
-
-Build both role-specific bootloaders and applications:
+Build ESP32 from an initialized ESP-IDF 6 shell:
 
 ```powershell
-.\tools\build-update-images.ps1
+. C:\esp\v6.0.2\esp-idf\export.ps1
+idf.py -C firmware\esp32 build
 ```
 
-The checked-in CubeMX project already contains the final FDCAN/TIM8 pinout.
-A blank STM32 receives its matching custom bootloader once over USART2 using
-the factory ROM bootloader. An external Linux service computer with USB-CAN
-can then upload application images through SocketCAN:
+Output: `firmware/esp32/build/ugv_esp32_aux.bin`.
 
-```bash
-python3 tools/ugv_can_update.py --interface can0 --node left \
-  --image UGV_STM32_LEFT.bin
-```
+## Flashing
 
-The updater rejects standalone images linked at the wrong address. Full wiring,
-one-time UART provisioning, CAN setup, update, and interrupted-transfer
-recovery are in [STM32 firmware update](docs/firmware-update.md).
-
-## Tests
-
-Run all HAL-independent motor math, safety/fault, CAN codec, and DBC-sync
-tests with:
+Flash each STM32 with its matching Left/Right standalone image through ST-Link:
 
 ```powershell
-.\tools\test-host.ps1
+.\tools\flash-left.ps1
+.\tools\flash-right.ps1
 ```
 
-`tools/build-all.ps1` runs these tests after both STM32 builds unless
-`-SkipHostTests` is supplied.
-
-## ESP32 build
-
-From an initialized ESP-IDF shell:
+Flash ESP32 through its onboard USB-UART bridge:
 
 ```powershell
-idf.py -C firmware/esp32 set-target esp32s3
-idf.py -C firmware/esp32 build
+idf.py -C firmware\esp32 -p COM3 flash
 ```
 
-The ESP32 project provides the board definition, shared CAN codec, CRSF input
-from XR4, safe manual-control arbitration, and Classic CAN/TWAI output. See
-[manual radio control](docs/manual-radio-control.md) for channel assignments,
-arming, first-start checks, and the current drive-mode limitation.
+GPIO43/GPIO44 remain available to the ROM downloader. At runtime UART0 is
+remapped to the Left link on GPIO39/GPIO40, so application console output is
+disabled to prevent log text from entering motor commands. Details and safety
+steps are in [firmware-update.md](docs/firmware-update.md).
 
-## Current bring-up status
+## Bring-up status
 
-The manual radio command path is implemented end-to-end in firmware: XR4 CRSF
-to ESP32, ESP32 final commands over CAN, and CAN dispatch to the two STM32
-motor nodes. It is build-tested and host-tested but still requires careful
-validation on the assembled vehicle with the wheels raised. The custom FDCAN
-bootloader, power-loss-safe flash state machine, application handoff, and Linux
-SocketCAN updater are also implemented and host-tested. FDCAN1, TIM8, the three
-common-enable GPIOs, and direct six-channel current sampling are enabled in the
-checked-in CubeMX application project. The current-sense
-amperes-per-volt scale still requires calibration against the selected
-motor-driver hardware. `UGV_CURRENT_SENSE_CALIBRATED` remains `0`, so firmware
-does not treat placeholder readings as valid current measurements.
+The complete manual path is implemented: XR4 CRSF → ESP32 → independent Left
+and Right UART commands → STM32 motor controllers. Commands are role-addressed,
+CRC-protected, sent every 20 ms, and locally time out after 300 ms. Both STM32
+nodes return RPM/current/safety telemetry at 10 Hz.
 
-See [architecture](docs/architecture.md), [wiring and wire colors](docs/wiring.md),
-[low-voltage power budget](docs/power-budget.md),
-[CubeMX configuration](docs/cubemx-configuration.md),
-[CAN protocol](docs/can-protocol.md), and the node pinout documents under
-`docs/`.
+ESP32 and both STM32 application images build successfully, and host tests
+cover UART framing/resynchronization, CRSF, manual mixing, motor math, and
+safety/fault behavior. Hardware validation must start with all wheels raised.
+Current-sense scaling is still uncalibrated, so current telemetry validity is
+disabled until the physical R_IS/L_IS circuits are verified.

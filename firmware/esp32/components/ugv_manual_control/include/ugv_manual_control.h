@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "ugv_can_protocol.h"
 #include "ugv_crsf.h"
+#include "ugv_uart_protocol.h"
 
 enum {
     UGV_RC_STEERING_CHANNEL = 0, /* EdgeTX CH1 / Aileron */

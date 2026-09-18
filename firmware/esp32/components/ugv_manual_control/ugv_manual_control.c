@@ -2,8 +2,6 @@
 
 #include <string.h>
 
-#include "ugv_can_protocol.h"
-
 #define RC_DEADBAND             0.05f
 #define RC_ARM_LOW_THRESHOLD   (-0.50f)
 #define RC_ARM_HIGH_THRESHOLD   0.50f
@@ -27,12 +25,12 @@ static void mix_drive(ugv_manual_control_t *control)
     const int16_t left_rpm = (int16_t)(left * UGV_RC_MAX_RPM);
     const int16_t right_rpm = (int16_t)(right * UGV_RC_MAX_RPM);
 
-    control->left_enable_mask = UGV_CAN_WHEEL_ENABLE_REAR;
+    control->left_enable_mask = UGV_WHEEL_ENABLE_REAR;
     if (control->drive_mode >= 2u) {
-        control->left_enable_mask |= UGV_CAN_WHEEL_ENABLE_CENTER;
+        control->left_enable_mask |= UGV_WHEEL_ENABLE_CENTER;
     }
     if (control->drive_mode >= 3u) {
-        control->left_enable_mask |= UGV_CAN_WHEEL_ENABLE_FRONT;
+        control->left_enable_mask |= UGV_WHEEL_ENABLE_FRONT;
     }
     control->right_enable_mask = control->left_enable_mask;
 
@@ -83,9 +81,9 @@ void ugv_manual_control_update(ugv_manual_control_t *control,
     }
 
     const bool channels_fresh = radio->channel_frame_count > 0u &&
-        (now_ms - control->last_channels_ms) <= UGV_CAN_RC_LINK_TIMEOUT_MS;
+        (now_ms - control->last_channels_ms) <= UGV_RC_LINK_TIMEOUT_MS;
     const bool stats_fresh = radio->link_stats_seen &&
-        (now_ms - control->last_link_stats_ms) <= UGV_CAN_RC_LINK_TIMEOUT_MS;
+        (now_ms - control->last_link_stats_ms) <= UGV_RC_LINK_TIMEOUT_MS;
     const bool receiver_reports_link = !stats_fresh || radio->link_quality_pct > 0u;
     const bool link_up = channels_fresh && receiver_reports_link;
 

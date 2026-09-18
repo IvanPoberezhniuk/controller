@@ -1,7 +1,7 @@
 # UGV low-voltage power budget
 
 This budget covers only the two MP1584EN modules used for controller logic,
-sensors, encoders, CAN transceivers, and IBT-2 logic. Motor power, lights, and
+sensors, encoders, UART interfaces, and IBT-2 logic. Motor power, lights, and
 Raspberry Pi 5 power are separate and are not included.
 
 The values below are conservative design allocations, not measured currents.
@@ -15,7 +15,7 @@ values during hardware bring-up.
 | --- | ---: | ---: |
 | STM32G431 silicon at 170 MHz | about 24 mA typical, `3.3 V x 0.024 A = 0.079 W` | - |
 | Complete STM32 board | application-dependent | 100 mA, `0.33 W` |
-| Complete local STM32 rail including CAN, three encoders, and three IBT-2 logic interfaces | application-dependent | 500 mA, `1.65 W` |
+| Complete local STM32 rail including three encoders and three IBT-2 logic interfaces | application-dependent | 500 mA, `1.65 W` |
 | ESP32-S3 silicon during maximum-power Wi-Fi TX | up to about 340 mA peak, `3.3 V x 0.340 A = 1.12 W` | - |
 | ESP32-S3 board | Espressif recommends at least a 500 mA supply | 600 mA, `1.98 W` allocation |
 | Complete central 3.3 V rail including ESP32 board and peripherals | application-dependent | 1.00 A, `3.30 W` |
@@ -47,7 +47,6 @@ This table applies separately to Left and Right.
 | Consumers on one STM32 node | Quantity | Current allocation |
 | --- | ---: | ---: |
 | STM32G431 board, MCU peripherals, LEDs, and board losses | 1 | 100 mA |
-| SN65HVD230 CAN transceiver | 1 | 20 mA |
 | GB37-520B Hall encoders | 3 | 75 mA total; provisional 25 mA each |
 | AHC244D-equipped IBT-2 logic interfaces and LEDs | 3 | 150 mA total; provisional 50 mA each |
 | Wiring loss, tolerance, and expansion margin | - | 155 mA |
@@ -55,16 +54,14 @@ This table applies separately to Left and Right.
 
 The STM32 silicon itself typically draws about 24 mA with CoreMark running at
 170 MHz, before application-specific peripheral and board loads. The 100 mA
-board allocation is therefore intentionally conservative. The SN65HVD230 data
-sheet specifies up to 17 mA supply current in dominant or recessive mode, which
-is rounded up to 20 mA here.
+board allocation is therefore intentionally conservative; removing each CAN
+transceiver adds roughly 20 mA of unused margin per former node.
 
 ## Central 3.3 V allocation
 
 | Consumers | Current allocation |
 | --- | ---: |
 | ESP32-S3 board including Wi-Fi current peaks | 600 mA |
-| SN65HVD230 CAN transceiver | 20 mA |
 | SH1106 OLED | 50 mA provisional |
 | QMI8658A, rotary encoder, ambient-light sensor, and pull-ups | 50 mA provisional |
 | Wiring loss, tolerance, and expansion margin | 280 mA |
@@ -107,7 +104,7 @@ separate supplies.
 
 1. Adjust each converter with its output disconnected, then power-cycle and
    verify `3.30 V` or `5.00 V` before attaching electronics.
-2. Measure each rail at startup, idle, full CAN traffic, ESP32 Wi-Fi transmit,
+2. Measure each rail at startup, idle, full UART traffic, ESP32 Wi-Fi transmit,
    XR4 telemetry transmit, and GPS cold start.
 3. Test converter temperature in the enclosure at the highest expected ambient
    temperature. Treat 10 W as a ceiling, not a continuous operating target.
@@ -120,7 +117,6 @@ separate supplies.
 
 - [MP1584 datasheet](https://www.monolithicpower.com/en/documentview/productdocument/index/version/2/document_type/Datasheet/lang/en/sku/MP1584EN-LF-Z/)
 - [STM32G431CB datasheet](https://www.st.com/resource/en/datasheet/stm32g431cb.pdf)
-- [SN65HVD230 datasheet](https://www.ti.com/lit/ds/symlink/sn65hvd230.pdf)
 - [ESP32-S3 hardware design guidelines](https://docs.espressif.com/projects/esp-hardware-design-guidelines/en/latest/esp32s3/schematic-checklist.html)
 - [RadioMaster XR4 specifications](https://www.radiomasterrc.com/products/xr4-gemini-xrossband-dual-band-expresslrs-receiver)
 - [HGLRC M100-5883 specifications](https://www.hglrc.com/products/m100-5883-gps)

@@ -11,19 +11,18 @@ add_subdirectory(cmake/stm32cubemx)
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/app_main.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/can_control_service.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/configuration.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/current_monitor.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/encoder.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/fault_manager.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/fw_update_service.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/motor_control.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/motor_math.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/safety.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/uart_control_service.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Src/board.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Src/timebase.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Src/watchdog.c
-    ${CMAKE_SOURCE_DIR}/shared/can/ugv_can_codec.c
+    ${CMAKE_SOURCE_DIR}/shared/serial/ugv_uart_protocol.c
     ${CMAKE_SOURCE_DIR}/shared/update/ugv_boot_request_stm32.c
     ${CMAKE_SOURCE_DIR}/shared/update/ugv_fw_update_protocol.c
 )
@@ -33,6 +32,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/firmware/stm32-${UGV_NODE_ROLE_LOWER}
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Inc
     ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Inc
+    ${CMAKE_SOURCE_DIR}/shared/serial
     ${CMAKE_SOURCE_DIR}/shared/can
     ${CMAKE_SOURCE_DIR}/shared/update
 )
@@ -41,6 +41,16 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     UGV_NODE_ROLE_${UGV_NODE_ROLE_UPPER}
 )
+
+if(UGV_NODE_ROLE_UPPER STREQUAL "LEFT")
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
+        UGV_BOOT_NODE_ID=0x10U
+    )
+else()
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
+        UGV_BOOT_NODE_ID=0x11U
+    )
+endif()
 
 if(UGV_LINKER_LAYOUT STREQUAL "OTA_APP")
     # SystemInit relocates VTOR even when the application is launched directly

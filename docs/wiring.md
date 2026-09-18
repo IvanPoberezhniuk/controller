@@ -16,19 +16,18 @@ disconnected until the harness has been continuity-checked.
                                                |
                                                v
                                          ESP32-S3
-                                         SN65HVD230
-                                               |
- CAN end A [120R] -- STM32 Left -- ESP32 -- STM32 Right -- [120R] CAN end B
-                         SN65HVD230 at every node
+                                          /     \
+                         3.3 V UART Left /       \ 3.3 V UART Right
+                                        v         v
+                                 STM32 Left     STM32 Right
+                                 PA2/PA3        PA2/PA3
 
  IMX708 camera --> Raspberry Pi 5 )))) Wi-Fi video )))) operator device
                          )))) optional Wi-Fi/IP )))) ESP32
-                         no connection to CAN-H/CAN-L
 ```
 
-The diagram shows logical order only. Put the terminators on the two physical
-ends of the installed trunk, regardless of which nodes happen to be there.
-Keep node stubs short and do not wire CAN as a passive star.
+The two motor links are independent point-to-point UARTs. Remove and unpower
+all SN65HVD230 modules, CAN-H/CAN-L wiring, jumpers, and 120-ohm termination.
 
 ## Harness color convention
 
@@ -36,14 +35,12 @@ Keep node stubs short and do not wire CAN as a passive star.
 | --- | --- | --- |
 | Positive supply | Red | Add a voltage label: `VBAT`, `5V`, or `3V3` |
 | Ground/reference | Black | `GND`; never use black for a driven signal |
-| CAN-H | Yellow | Twist together with CAN-L |
-| CAN-L | Green | Twist together with CAN-H |
 | UART device TX to controller RX | White | UART signal entering an MCU |
 | UART controller TX to device RX | Orange | UART signal leaving an MCU |
-| CAN transceiver `R/RXD` to MCU CAN RX | Purple | CAN receive logic signal entering an MCU |
-| MCU CAN TX to CAN transceiver `D/TXD` | Brown | CAN transmit logic signal leaving an MCU |
+| ESP32 motor command TX | Brown | ESP TX to the matching STM32 PA3 RX |
+| STM32 telemetry TX | Purple | STM32 PA2 TX to the matching ESP RX |
 | I2C SDA | Blue | Use the same convention on both I2C buses |
-| I2C SCL | Yellow | Separate harness from CAN to avoid confusion |
+| I2C SCL | Yellow | Keep separate from motor/PWM wiring |
 | Interrupt/button | White | Add a printed signal label |
 | Unassigned/reserve | No wire | Do not pre-wire TBD pins |
 
@@ -80,8 +77,8 @@ from the GPS antenna, then test GPS fix quality while Gem-X is transmitting.
 
 ## ESP32-S3 peripheral wiring
 
-Target board: Sixspan ESP32-S3-N16R8. GPIO39-GPIO42 remain free after all
-assignments below.
+Target board: Sixspan ESP32-S3-N16R8. GPIO39-GPIO42 are assigned to the two
+motor UARTs.
 
 ### Shared 3.3 V and central 5 V supplies
 
@@ -93,8 +90,8 @@ Protected DC logic branch
           |
           +--> MP1584EN #1: 3.30 V, 2 A / 6.6 W design allocation
           |       +--> fused Central branch: ESP32 and central 3V3 peripherals
-          |       +--> fused Left branch: STM32, CAN, 3 encoders, 3 IBT-2 logic
-          |       `--> fused Right branch: STM32, CAN, 3 encoders, 3 IBT-2 logic
+          |       +--> fused Left branch: STM32, 3 encoders, 3 IBT-2 logic
+          |       `--> fused Right branch: STM32, 3 encoders, 3 IBT-2 logic
           |
           `--> MP1584EN #2: 5.00 V
                   +--> XR4 receiver
@@ -128,23 +125,20 @@ Both MP1584EN modules are step-down converters. Their inputs must remain within
 with all output loads disconnected, power-cycle it, and verify `3.30 V` or
 `5.00 V` again before connecting electronics. Secure the trimmers after setup.
 
-### SN65HVD230 CAN transceiver
+### ESP32 to motor-node UARTs
 
-| From | To | Color | Status / note |
+| From | To | Color | Link |
 | --- | --- | --- | --- |
-| ESP32 `GPIO17` (`TWAI_TX`) | Module `TX` (SN65HVD230 `D/TXD`) | Brown | FINAL; add 10 kohm pull-up to 3V3 |
-| Module `RX` (SN65HVD230 `R/RXD`) | ESP32 `GPIO18` (`TWAI_RX`) | Purple | FINAL; logic-side signal |
-| ESP32 `3V3` | Module `3.3V` (SN65HVD230 `VCC`) | Red, label `3V3` | Never power this part from 5 V |
-| ESP32 `GND` | Module `GND` | Black | Common signal reference |
-| Module screw terminal `CANH` | CAN-H trunk | Yellow | Twisted pair |
-| Module screw terminal `CANL` | CAN-L trunk | Green | Twisted pair |
+| ESP32 `GPIO39 / LEFT_TX` | Left STM32 `PA3 / USART2_RX` | Brown | Command |
+| Left STM32 `PA2 / USART2_TX` | ESP32 `GPIO40 / LEFT_RX` | Purple | Telemetry |
+| ESP32 `GPIO41 / RIGHT_TX` | Right STM32 `PA3 / USART2_RX` | Brown | Command |
+| Right STM32 `PA2 / USART2_TX` | ESP32 `GPIO42 / RIGHT_RX` | Purple | Telemetry |
+| ESP32 `GND` | Both STM32 `GND` | Black | Logic reference |
 
-Place 100 nF directly across transceiver VCC/GND and a CAN TVS such as
-SM24CANB close to the bus connector. ESP32 GPIOs must never connect directly
-to CAN-H/CAN-L. On the pictured four-pin module, `RS` and `Vref` are handled on
-the PCB and are not exposed on the header. Its yellow two-pin jumper enables
-the onboard 120 ohm CANH-to-CANL terminator; install that jumper only when this
-module is at a physical end of the CAN trunk.
+Both links are 115200 baud 8N1 at 3.3 V. TX connects directly to the other
+endpoint's RX; no transceiver is placed between them. For longer wiring, twist
+each signal with a ground companion and optionally add 100-220 ohms in series
+near each TX output. Keep these wires away from motor and PWM wiring.
 
 ### SH1106 OLED
 
@@ -236,10 +230,11 @@ buzzer directly from ESP32.
 | GPIO | Use |
 | --- | --- |
 | `19/20` | Native USB D-/D+; reserved |
-| `43/44` | UART0 programming/logging; reserved |
+| `43/44` | ROM programming UART; application logging is disabled |
 | `47` | Optional service LED |
 | `48` | Onboard addressable RGB LED |
-| `39/40/41/42` | Free safe GPIO reserve |
+| `39/40` | Left STM32 TX/RX link |
+| `41/42` | Right STM32 TX/RX link |
 | `0/3/45/46` | Boot-strapping pins; do not allocate in this harness |
 | `26-37` | Excluded because of flash/PSRAM/board restrictions |
 
@@ -252,10 +247,10 @@ the three left wheels; the Right board connects them to the three right wheels.
 ### Shared 3.3 V branch at each STM32 node
 
 Each motor node receives a separate branch from the shared 3.3 V star point.
-One node reserves `0.5 A / 1.65 W` for its STM32 board, SN65HVD230, three motor
-encoders, and three IBT-2 logic interfaces. Add local bulk decoupling at the
-node power entrance and 100 nF at each IC supply pair. Verify 3.3 V at the node
-while all three motors switch and while CAN traffic is active.
+One node reserves `0.5 A / 1.65 W` for its STM32 board, three motor encoders,
+and three IBT-2 logic interfaces. Add local bulk decoupling at the node power
+entrance and 100 nF at each IC supply pair. Verify 3.3 V at the node while all
+three motors switch and UART traffic is active.
 
 ### BTS7960/IBT-2 power domains
 
@@ -367,27 +362,18 @@ sense output directly to the STM32.
 `PB1`, `PB11`, and `PB13` are free GPIO reserve. Leave them unconnected until a
 future function is deliberately added to both the schematic and CubeMX file.
 
-### STM32 SN65HVD230 CAN transceiver
+### STM32 motor-link UART
 
-| From | To | Color | Status / note |
-| --- | --- | --- | --- |
-| STM32 `PA12 / FDCAN1_TX` | Module `TX` (SN65HVD230 `D/TXD`) | Brown | FINAL; 10 kohm pull-up to 3V3 |
-| Module `RX` (SN65HVD230 `R/RXD`) | STM32 `PA11 / FDCAN1_RX` | Purple | FINAL |
-| STM32 `3V3` | Module `3.3V` (SN65HVD230 `VCC`) | Red, label `3V3` | Never connect to 5 V |
-| STM32 `GND` | Module `GND` | Black | Common signal reference |
-| Module screw terminal `CANH` | CAN-H trunk | Yellow | Twisted with CAN-L |
-| Module screw terminal `CANL` | CAN-L trunk | Green | Twisted with CAN-H |
-
-PA11/PA12 connect only to the transceiver logic pins, never directly to
-CAN-H/CAN-L. Place 100 nF at VCC/GND and SM24CANB at the bus connector. The
-bootloader and application both configure these pins.
+Each STM32 uses `PA3 / USART2_RX` for commands from ESP32 and
+`PA2 / USART2_TX` for telemetry back to ESP32. PA11 and PA12 are free GPIO;
+FDCAN is disabled in the application and CubeMX project.
 
 ### STM32 service connections
 
 | Function | STM32 pin | Color | Status |
 | --- | --- | --- | --- |
-| USART2 TX / adapter RX | `PA2` | Orange | Console and factory ROM provisioning |
-| USART2 RX / adapter TX | `PA3` | White | Console and factory ROM provisioning |
+| USART2 TX | `PA2` | Purple | Runtime telemetry to matching ESP32 RX |
+| USART2 RX | `PA3` | Brown | Runtime command from matching ESP32 TX |
 | ROM boot select | Onboard `BOOT0` button | No wire | Hold BOOT0, tap NRST, then release BOOT0 |
 | SWDIO | `PA13` | Blue | Optional debug/recovery test pad |
 | SWCLK | `PA14` | Yellow | Optional debug/recovery test pad |
@@ -407,31 +393,18 @@ during provisioning and follow [`firmware-update.md`](firmware-update.md).
 | Regulated Pi 5 V supply | Raspberry Pi power input | Dedicated fused branch sized for Pi and camera |
 | Wi-Fi | Operator access point/device | Video, logging and future IP control |
 | Optional Wi-Fi/IP | ESP32 | Future autonomy requests and relayed telemetry |
-| CAN-H / CAN-L | No connection | Raspberry Pi is not a runtime CAN node |
+| Motor UARTs | No connection | Raspberry Pi is not in the motor path |
 
 Do not run camera data through ESP32. Raspberry Pi encodes and streams video
 directly over Wi-Fi. A Pi or Wi-Fi failure must not affect the XR4 to ESP32 to
 STM32 manual-control path.
 
-## CAN trunk
+## Removed CAN hardware
 
-| Bus conductor | Color | Wiring rule |
-| --- | --- | --- |
-| CAN-H | Yellow | One continuous conductor, daisy-chain nodes |
-| CAN-L | Green | Twist with CAN-H for the complete trunk |
-| CAN reference ground | Black | Connect node signal grounds; do not carry motor current |
-| Shield/drain, if used | Bare/clear | Bond according to the final enclosure grounding plan |
-
-Use Classic CAN at 500 kbit/s. Install exactly two 120 ohm resistors between
-CAN-H and CAN-L, one at each physical end. With power off, a resistance check
-between CAN-H and CAN-L should be approximately 60 ohms when both terminators
-are installed.
-
-Only STM32 Left, ESP32, and STM32 Right are permanent CAN nodes, each with one
-SN65HVD230 module. If that is also their physical order, install the pictured
-module's yellow 120 ohm termination jumper at Left and Right only; leave the
-ESP32 module's jumper removed. Raspberry Pi has no permanent CAN transceiver.
-A USB-CAN adapter may be attached temporarily during firmware service.
+There is no CAN trunk in the current build. Disconnect CAN-H/CAN-L from all
+three boards, remove every yellow jumper and termination resistor, and leave
+all SN65HVD230 modules unpowered or remove them completely. Never join the two
+independent UART links together in parallel.
 
 ## Power and grounding rules
 
@@ -439,7 +412,7 @@ Planned MP1584EN count:
 
 | Quantity | Setting | Power domain |
 | --- | --- | --- |
-| 1 | `3.30 V` | All shared 3.3 V loads: ESP32, both STM32 nodes, CAN, sensors, encoders, and IBT-2 logic |
+| 1 | `3.30 V` | ESP32, both STM32 nodes, sensors, encoders, and IBT-2 logic |
 | 1 | `5.00 V` | XR4 and M100-5883 |
 
 The normal plan therefore uses two MP1584EN modules. Raspberry Pi 5, motor
@@ -455,7 +428,7 @@ measurement requirements.
   at the planned distribution point.
 - Do not connect separate 3.3 V regulator outputs together.
 - The physical emergency stop must disable motor-drive power or driver-enable
-  independently of CAN and software while allowing the Pi to remain powered
+  independently of UART and software while allowing the Pi to remain powered
   for logging when practical.
-- Before first power-up, check continuity, polarity, CAN termination, and
+- Before first power-up, check continuity, polarity, crossed TX/RX pairs, and
   absence of shorts with the battery disconnected.

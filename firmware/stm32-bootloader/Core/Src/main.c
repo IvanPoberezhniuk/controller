@@ -1,11 +1,12 @@
 #include <stdint.h>
 
 #include "stm32g4xx_hal.h"
-#include "ugv_boot_can.h"
 #include "ugv_boot_flash.h"
 #include "ugv_boot_request_stm32.h"
+#include "ugv_boot_uart.h"
 #include "ugv_bootloader.h"
 #include "ugv_fw_update_protocol.h"
+#include "ugv_uart_protocol.h"
 
 #ifndef UGV_BOOT_NODE_ID
 #error "UGV_BOOT_NODE_ID must identify the LEFT or RIGHT motor node"
@@ -56,15 +57,11 @@ int main(void)
         ugv_boot_flash_jump_to_application();
     }
 
-    if (!ugv_boot_can_init((uint8_t)UGV_BOOT_NODE_ID)) {
+    if (!ugv_boot_uart_init()) {
         for (;;) {
             IWDG->KR = 0xaaaau;
         }
     }
-
-    uint16_t data_identifier = 0u;
-    (void)ugv_fw_data_id_for_node((uint8_t)UGV_BOOT_NODE_ID,
-                                  &data_identifier);
 
     ugv_boot_flash_context_t flash_context;
     ugv_boot_flash_init(&flash_context, (uint8_t)UGV_BOOT_NODE_ID);
@@ -76,32 +73,31 @@ int main(void)
     for (;;) {
         IWDG->KR = 0xaaaau;
 
-        ugv_boot_can_frame_t frame;
-        if (!ugv_boot_can_receive(&frame)) {
+        ugv_uart_frame_t frame;
+        if (!ugv_boot_uart_receive(&frame)) {
             continue;
         }
 
         ugv_fw_status_t status;
         bool send_status = false;
-        if (frame.identifier == UGV_FW_CAN_ID_COMMAND) {
+        if (frame.type == UGV_UART_MSG_FW_COMMAND) {
             ugv_fw_command_t command;
             if (ugv_fw_decode_command(&command, frame.payload,
-                                      sizeof(frame.payload))) {
+                                      frame.payload_size)) {
                 send_status = ugv_bootloader_handle_command(
                     &bootloader, &command, &status);
             }
-        } else if (frame.identifier == data_identifier) {
+        } else if (frame.type == UGV_UART_MSG_FW_DATA) {
             ugv_fw_data_t data;
             if (ugv_fw_decode_data(&data, frame.payload,
-                                   sizeof(frame.payload))) {
+                                   frame.payload_size)) {
                 send_status = ugv_bootloader_handle_data(
                     &bootloader, &data, &status);
             }
         }
 
         if (send_status) {
-            (void)ugv_boot_can_send_status((uint8_t)UGV_BOOT_NODE_ID,
-                                           &status);
+            (void)ugv_boot_uart_send_status(&status);
         }
     }
 }

@@ -8,7 +8,7 @@
 #include "fault_manager.h"
 #include "motor_control.h"
 #include "safety.h"
-#include "ugv_can_protocol.h"
+#include "ugv_uart_protocol.h"
 
 static uint32_t s_tick_ms;
 static MotorState s_motors[UGV_MOTOR_COUNT];
@@ -87,7 +87,7 @@ static void reset_fixture(void)
 
 static void arm_to_ready(void)
 {
-    safety_set_motor_enable_mask(UGV_CAN_WHEEL_ENABLE_ALL);
+    safety_set_motor_enable_mask(UGV_WHEEL_ENABLE_ALL);
     safety_notify_command_received();
     safety_request_arm();
     safety_update();
@@ -99,7 +99,7 @@ static void arm_to_ready(void)
 static void test_enable_mask_controls_individual_drivers(void)
 {
     reset_fixture();
-    safety_set_motor_enable_mask(UGV_CAN_WHEEL_ENABLE_REAR);
+    safety_set_motor_enable_mask(UGV_WHEEL_ENABLE_REAR);
     safety_notify_command_received();
     safety_request_arm();
     safety_update();

@@ -13,13 +13,7 @@ void app_main_init(void);
 void app_main_run(void);
 
 /* Called from USART2_IRQHandler (Core/Src/stm32g4xx_it.c) on RXNE. Captures
- * RDR into a ring buffer so console bytes survive control-loop ticks that
- * run longer than a byte interval; the main loop drains it in poll_uart_rx. */
+ * binary ESP32 link bytes into the service ring buffer. */
 void app_main_uart2_rx_isr(void);
-
-/* Called by the future FDCAN command dispatcher for UGV_FW_COMMAND_ENTER.
- * The request is accepted only in a motor-safe state and only by an OTA-linked
- * application. On success the function resets and therefore never returns. */
-bool app_main_request_bootloader(void);
 
 #endif /* APPLICATION_APP_MAIN_H */

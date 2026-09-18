@@ -3,172 +3,85 @@
 ## Runtime topology
 
 ```text
- Radio handset + RadioMaster Nomad
-          2.4 GHz + 900 MHz Gem-X
-                     |
-              RadioMaster XR4
-                     |
-          full-duplex CRSF, 420000 baud
-                     |
-                     v
-            ESP32-S3 control/AUX node <------ Wi-Fi/IP ------ Raspberry Pi 5
-            - MANUAL/AUTO arbiter                            - IMX708 camera/audio
-            - final motion authority                         - video streaming
-            - OLED, QMI8658A, M100-5883                     - future navigation
-            - lights and warning buzzer                      - logging/network
-                     |
-          final Classic CAN commands, 500 kbit/s
-                     |
-             +-------+-------+
-             |               |
-             v               v
-        STM32 Left       STM32 Right
-        3 left motors    3 right motors
-        encoders         encoders
-        direct ADC       direct ADC
-        local safety     local safety
-        shared 3V3       shared 3V3
-
- Raspberry Pi 5 ------ Wi-Fi video ------> operator phone/laptop
+Radio handset + Nomad ))) RF ))) XR4
+                              |
+                      CRSF UART 420000
+                              |
+                          ESP32-S3 <--- Wi-Fi/IP ---> Raspberry Pi 5
+                         /         \
+       UART0 115200     /           \     UART2 115200
+       GPIO39/40       v             v    GPIO41/42
+                  STM32 Left     STM32 Right
+                  PA3 RX/PA2 TX  PA3 RX/PA2 TX
+                   3 motors       3 motors
 ```
 
-The runtime CAN trunk has exactly three nodes: ESP32, STM32 Left, and STM32
-Right. Each uses its own SN65HVD230 transceiver. Raspberry Pi has no CAN
-transceiver and no CAN wiring. The two STM32 nodes close their own speed-control
-and safety loops. The ESP32 chooses the active command source but never
-performs motor PID control.
+CAN is not used in the runtime architecture. The three SN65HVD230 modules,
+CAN-H/CAN-L wiring, and 120-ohm termination are removed and unpowered. ESP32
+has one private full-duplex 3.3 V UART link to each motor node. Both links run
+at 115200 baud, 8 data bits, no parity, one stop bit.
 
-One MP1584EN adjusted to 3.30 V supplies a star-distributed shared logic rail
-for the ESP32 board, both STM32 nodes, all three SN65HVD230 transceivers, six
-motor encoders, six AHC244D-equipped IBT-2 logic interfaces, and central 3.3 V
-peripherals. Its design allocation is 2 A / 6.6 W. A second MP1584EN adjusted
-to 5.00 V supplies XR4 and M100-5883. Raspberry Pi 5, BTS7960 motor power, and
-lights remain on separate appropriately rated protected power branches.
+The ESP32 chooses the active command source and sends a separate three-wheel
+command every 20 ms to each STM32. Each STM32 closes its own PID and safety
+loops, validates the target role and CRC, and disables its drivers when no
+valid command arrives for 300 ms. The STM32 nodes return RPM, current fields,
+safety state, and validity/fault masks at 10 Hz.
 
-Manual control is independent of Raspberry Pi and Wi-Fi. If either fails, the
-ELRS/XR4 to ESP32 to CAN path remains operational; only video, Pi logging, and
-future Pi autonomy are lost.
+Manual control remains independent of Raspberry Pi and Wi-Fi. Raspberry Pi
+owns video, logging, navigation, and future autonomy requests; it is not in
+the motor safety path.
 
-## STM32 boot and update path
+## Control authority and safety
 
-Each STM32 has a role-specific custom bootloader at `0x08000000` and an OTA
-application at `0x08006000`. During maintenance, an external Linux service
-computer and USB-CAN adapter temporarily connect to the 500 kbit/s CAN trunk.
-The running motor application accepts `ENTER` only from a safe
-disabled/fault/estop state, disables all motor outputs, and resets into the
-bootloader.
-
-The bootloader invalidates application metadata before erasing any application
-page. It writes sequenced six-byte CAN chunks, verifies the complete image
-CRC-32 and vector table, then commits the metadata magic last. A power failure
-during transfer therefore leaves the STM32 in CAN recovery instead of booting
-a partial program. There is one application slot, so this is safe recovery but
-not A/B rollback.
-
-A blank MCU needs the custom bootloader installed once through the factory ROM
-USART2 interface on PA2/PA3. On the WeAct STM32G431 core board, enter the ROM
-bootloader with its onboard BOOT0 and NRST buttons; PB8 is not exposed on the
-headers. The STM32G431 ROM bootloader does not expose FDCAN. After that first
-provisioning, ST-Link and UART are not needed for normal application updates.
-See [`firmware-update.md`](firmware-update.md).
-
-## Control authority
-
-Only the ESP32 may publish the final `WheelTargetsLeft` (`0x102`),
-`WheelTargetsRight` (`0x103`), and `SystemEnable` (`0x110`) frames consumed by
-the motor nodes. A future Raspberry Pi autonomy service sends requests to
-ESP32 over an authenticated Wi-Fi/IP protocol, never directly to CAN. This
-keeps Raspberry Pi outside the critical motor bus and prevents competing final
-command producers.
-
-| Selected mode | Accepted source | Failure behavior |
-| --- | --- | --- |
-| `DISABLED` | None | Final targets are zero and motor enable is false |
-| `MANUAL` | Valid XR4 CRSF link | RC loss/failsafe stops and disables the vehicle |
-| `AUTO` | Fresh Raspberry Pi Wi-Fi request | Stale network request stops and disables the vehicle |
-
-The operator selects the mode explicitly. Failure of the selected source must
-not cause an automatic change to another source; for example, loss of the Pi
-in AUTO never activates a non-neutral RC stick unexpectedly.
-
-## Safety chain
+Only ESP32 produces final left/right motor commands. A frame contains a role
+(`LEFT` or `RIGHT`), three independent signed RPM targets, a three-bit wheel
+enable mask, ARM/ESTOP flags, a sequence number, and CRC-16-CCITT. A node
+rejects a command for the opposite role, so swapping the two UART harnesses
+cannot drive the wrong side.
 
 ```text
-XR4 frame age/CRSF failsafe       100 ms
-              |
-Pi Wi-Fi AUTO request age         300 ms
-              |
-ESP32 final command period        10-20 ms
-              |
-STM32 final command timeout       300 ms
-              |
-local current/encoder/driver checks
-              |
-motor-driver enable outputs
+XR4 frame timeout              100 ms
+ESP32 command period            20 ms
+STM32 valid-command timeout    300 ms
+local encoder/current checks
+physical emergency disconnect
 ```
 
-The timeouts are declared in `shared/can/ugv_can_protocol.h`. Any reset starts
-disabled and requires explicit re-arm. A physical emergency-stop must remove
-motor drive capability independently of ESP32, Raspberry Pi, CAN, and normal
-software execution.
+Any reset begins disabled. ARM requires the configured low-to-high switch
+edge with neutral controls. Loss of CRSF makes ESP32 send zero/disarm, and
+loss or corruption of UART commands independently times out each STM32.
+A physical emergency stop must still remove motor-drive capability without
+depending on any MCU or communication link.
 
-## Responsibility boundaries
+## Power boundaries
 
-- STM32 nodes own motor PWM/enables, quadrature encoders, local current
-  sampling, final-command timeout, target reset, and driver disable.
-- ESP32 owns XR4/CRSF input, MANUAL/AUTO arbitration, final vehicle commands,
-  the local display/control panel, QMI8658A IMU, M100-5883 GPS/compass,
-  future light sensor, lighting outputs, warning buzzer, and the future Wi-Fi
-  command/telemetry gateway.
-- Raspberry Pi owns the IMX708 camera, full speaker/audio path, navigation,
-  video streaming, future Wi-Fi autonomy requests, telemetry storage, and
-  logging. It never publishes or receives CAN frames directly.
+One MP1584EN adjusted to 3.30 V supplies the ESP32, both STM32 boards, six
+encoders, IBT-2 logic, and other 3.3 V peripherals through separate star
+branches. Removing three CAN transceivers slightly reduces this load. A second
+MP1584EN adjusted to 5.00 V supplies XR4 and M100-5883. Motor power, Raspberry
+Pi 5 V, and lights use their own fused branches.
 
-## Source ownership
+Every UART endpoint must share logic ground. Motor-current returns must not
+flow through those signal-ground wires.
 
-`firmware/stm32-common` is the only copy of generated STM32 code, HAL drivers,
-motor control, safety, and platform adapters. `firmware/stm32-left` and
-`firmware/stm32-right` contain target identity and calibration only.
+## Firmware and ownership
 
-`firmware/esp32` is an independent ESP-IDF project. It does not include or
-modify the older `blinkESP32` repository.
+- `shared/serial` defines the platform-neutral framed UART protocol.
+- `firmware/esp32` owns CRSF parsing, arming, drive mixing, both motor UARTs,
+  and telemetry forwarding.
+- `firmware/stm32-common` owns USART2 command reception, local motor control,
+  encoders, current sampling, faults, watchdog, and telemetry.
+- `firmware/stm32-left` and `firmware/stm32-right` contain role and direction
+  configuration only.
 
-`shared/can` is platform-neutral and is consumed by STM32, ESP32, service
-tools, and host tests. Raspberry Pi uses a separate Wi-Fi/IP contract with
-ESP32. C structures are never copied directly to CAN data; the codec defines
-byte order and payload length explicitly.
-
-## RF and GPS placement
-
-Mount the XR4 and its two antennas away from the GPS receiver/antenna, motor
-wiring, DC/DC converters, and CAN transceivers. Validate GPS satellite count
-and fix quality with Gem-X transmitting before fixing the final enclosure
-layout. This is especially important because XR4 Xrossband installations have
-reported GPS interference when RF and GNSS hardware are placed close together.
+The former CAN bootloader/update implementation remains only as legacy source
+history and is not part of the current application builds. Current STM32
+application updates use ST-Link; see [firmware-update.md](firmware-update.md).
 
 ## Current implementation boundary
 
-The CAN update protocol, STM32 bootloader, flash validation/recovery logic,
-application-to-bootloader handoff, and Linux SocketCAN service uploader are
-implemented and host-tested, but not yet validated on assembled hardware. The
-checked-in CubeMX project contains the final FDCAN1, TIM8, common-enable, and
-six direct current-sense ADC configuration.
-
-The manual command path is implemented and build-tested: ESP32 decodes XR4
-CRSF, enforces explicit arm/ESTOP/link-loss rules, mixes throttle and steering,
-and publishes final CAN commands; both STM32 applications filter and decode
-those commands, select their left/right target, and enforce the local 300 ms
-command timeout. It has not yet been validated with powered motors. STM32
-telemetry, Pi camera streaming, AUTO mode, and the ESP32-to-Pi Wi-Fi protocol
-remain separate milestones. USART2 remains available for motor-node bench
-commands.
-
-The two Classic-CAN wheel-target frames carry six independent signed RPM
-values and a three-bit enable mask for each side. The current radio mixer gives
-engaged wheels on the same side the same skid-steer target, while CH3 selects
-rear-only 2WD, middle-plus-rear 4WD, or all-wheel 6WD. The protocol and STM32
-dispatcher can accept different targets for every wheel when a future control
-algorithm needs them.
-
-Each STM32 samples its six R_IS/L_IS signals directly: five ADC2 ranks and one
-ADC1 channel. No external analog multiplexer is used.
+The dual-UART runtime path is implemented and build-tested for ESP32, STM32
+Left, and STM32 Right. The host suite tests framing, byte order, CRC rejection,
+parser resynchronization, manual mixing, and STM32 safety logic. Hardware
+validation must still begin with all wheels raised and motor power readily
+disconnectable. Current-sense scaling remains uncalibrated.

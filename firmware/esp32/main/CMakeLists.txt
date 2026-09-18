@@ -1,6 +1,6 @@
 idf_component_register(
-    SRCS "main.c"
+    SRCS "main.c" "stm32_uart_updater.c"
     INCLUDE_DIRS "."
-    REQUIRES ugv_board ugv_can ugv_crsf ugv_manual_control
-             esp_driver_uart esp_driver_twai esp_timer
+    REQUIRES ugv_board ugv_crsf ugv_manual_control ugv_serial ugv_update
+             esp_driver_gpio esp_driver_uart esp_timer
 )

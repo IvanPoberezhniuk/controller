@@ -6,8 +6,10 @@
 #define UGV_CRSF_BAUD_RATE 420000u
 
 typedef struct {
-    gpio_num_t can_tx;
-    gpio_num_t can_rx;
+    gpio_num_t left_uart_tx;
+    gpio_num_t left_uart_rx;
+    gpio_num_t right_uart_tx;
+    gpio_num_t right_uart_rx;
     gpio_num_t oled_sda;
     gpio_num_t oled_scl;
     gpio_num_t encoder_a;

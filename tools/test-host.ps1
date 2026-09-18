@@ -37,6 +37,11 @@ try {
         "Tests/can/test_can_codec.c", "shared/can/ugv_can_codec.c"
     )
 
+    Build-And-Run "test_uart_protocol" @(
+        "-std=c11", "-Wall", "-Wextra", "-Werror", "-Ishared/serial",
+        "Tests/serial/test_uart_protocol.c", "shared/serial/ugv_uart_protocol.c"
+    )
+
     Build-And-Run "test_crsf" @(
         "-std=c11", "-Wall", "-Wextra", "-Werror",
         "-Ifirmware/esp32/components/ugv_crsf/include",
@@ -46,7 +51,7 @@ try {
 
     Build-And-Run "test_manual_control" @(
         "-std=c11", "-Wall", "-Wextra", "-Werror",
-        "-Ishared/can",
+        "-Ishared/serial",
         "-Ifirmware/esp32/components/ugv_crsf/include",
         "-Ifirmware/esp32/components/ugv_manual_control/include",
         "Tests/esp32/test_manual_control.c",
@@ -83,7 +88,7 @@ try {
         "-std=c11", "-Wall", "-Wextra", "-Werror", "-DUGV_NODE_ROLE_LEFT",
         "-ITests/stm32/fakes", "-Ifirmware/stm32-common/Application/Inc",
         "-Ifirmware/stm32-common/Platform/Inc", "-Ifirmware/stm32-left",
-        "-Ishared/can"
+        "-Ishared/serial"
     )
     Build-And-Run "test_safety" ($stm32TestIncludes + @(
         "Tests/stm32/test_safety.c",

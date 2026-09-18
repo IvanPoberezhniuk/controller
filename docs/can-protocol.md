@@ -1,4 +1,8 @@
-# CAN protocol
+# Legacy CAN protocol (retired)
+
+> This document describes the former transport. Current motor control uses
+> two private UART links defined in [uart-protocol.md](uart-protocol.md).
+> CAN hardware is removed and this contract remains only for source history.
 
 Classic CAN runs at 500 kbit/s. `shared/can/ugv_can_protocol.h` is the wire
 contract for message IDs, DLCs, units, payload types, and timeout constants.

@@ -27,8 +27,8 @@ void safety_update(void);
 safety_state_t safety_get_state(void);
 const char *safety_state_name(safety_state_t state);
 
-/* Stand-in for "valid CAN communication" / "fresh command source" until the
- * CAN milestone: call this whenever a valid command is received. */
+/* Call whenever a complete, CRC-valid command is received over the local
+ * ESP32 UART link. */
 void safety_notify_command_received(void);
 
 /* Explicit re-arm request. After any reset or fault, the system stays

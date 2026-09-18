@@ -15,6 +15,7 @@
 #define UGV_FW_DATA_BYTES_PER_FRAME   6u
 #define UGV_FW_ACK_INTERVAL_FRAMES    32u
 #define UGV_FW_BROADCAST_NODE         0xffu
+#define UGV_FW_ENTER_MAGIC            0x55475655u /* "UGVU" */
 
 /* Service host -> STM32 command; node-specific data streams avoid spending
  * one of the eight Classic-CAN bytes on a target field. Status IDs identify

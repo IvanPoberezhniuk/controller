@@ -267,6 +267,12 @@ _Noreturn void ugv_boot_flash_jump_to_application(void)
     __set_MSP(vectors[0]);
     __DSB();
     __ISB();
+
+    /* A hardware reset enters Reset_Handler with PRIMASK clear. Recreate that
+     * state before the software jump: leaving PRIMASK set prevents every
+     * application interrupt, including USART2 RXNE, even after the application
+     * configures the NVIC and peripheral interrupt-enable bits. */
+    __enable_irq();
     entry();
     for (;;) {
     }

@@ -1,92 +1,63 @@
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
 
 #include "driver/uart.h"
+#include "driver/gpio.h"
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_timer.h"
-#include "esp_twai.h"
-#include "esp_twai_onchip.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
 #include "freertos/task.h"
 
-#include "ugv_can_codec.h"
-#include "ugv_can_protocol.h"
 #include "ugv_crsf.h"
 #include "ugv_esp32_board.h"
 #include "ugv_manual_control.h"
+#include "ugv_uart_protocol.h"
+#include "stm32_uart_updater.h"
 
 static const char *TAG = "ugv_control";
-static twai_node_handle_t s_twai_node;
-static bool s_twai_recovering;
-/* ESP-IDF's node API queues pointers instead of copying frames. Keep the
- * frame and its data alive until the driver confirms that transmission is
- * complete, including no-ACK and bus-off cases. */
-static twai_frame_t s_twai_tx_frame;
-static uint8_t s_twai_tx_payload[8];
-static bool s_twai_tx_pending;
-static QueueHandle_t s_can_rx_queue;
+
+#define RC_UART             UART_NUM_1
+#define LEFT_MOTOR_UART     UART_NUM_0
+#define RIGHT_MOTOR_UART    UART_NUM_2
+#define RPM_RADIO_PERIOD_MS 200u
+#define DIAGNOSTIC_RADIO_PERIOD_MS 1000u
+#define UPDATE_BUTTON_GPIO GPIO_NUM_0
+#define UPDATE_BUTTON_HOLD_MS 2000u
+#define FORCE_STM32_UPDATER_ON_BOOT 0
 
 typedef struct {
-    uint32_t identifier;
-    uint8_t size;
-    uint8_t payload[8];
-} can_rx_message_t;
+    uart_port_t port;
+    uint8_t node_role;
+    uint8_t tx_sequence;
+    uint32_t control_tx_count;
+    uint32_t control_tx_fail_count;
+    ugv_uart_parser_t parser;
+} motor_link_t;
 
 typedef struct {
     int32_t rpm[6];
     uint32_t received_ms[2];
+    uint32_t frame_count[2];
+    uint8_t safety_state[2];
+    uint8_t fault_mask[2];
+    uint8_t valid_mask[2];
+    uint16_t control_rx_count[2];
+    uint8_t last_control_flags[2];
+    uint8_t last_enabled_mask[2];
     bool side_seen[2];
 } motor_telemetry_t;
-
-#define RC_UART                 UART_NUM_1
-#define CONTROL_PERIOD_MS       20u
-#define STATUS_LOG_PERIOD_MS    1000u
-#define RPM_RADIO_PERIOD_MS     200u
-
-static bool IRAM_ATTR can_rx_done(twai_node_handle_t node,
-                                  const twai_rx_done_event_data_t *event,
-                                  void *user_context)
-{
-    (void)event;
-    (void)user_context;
-    uint8_t payload[8] = {0};
-    twai_frame_t frame = {
-        .buffer = payload,
-        .buffer_len = sizeof(payload),
-    };
-    if (twai_node_receive_from_isr(node, &frame) != ESP_OK ||
-        frame.header.ide || frame.header.rtr || frame.header.fdf) {
-        return false;
-    }
-
-    can_rx_message_t message = {
-        .identifier = frame.header.id,
-        .size = (uint8_t)twaifd_dlc2len(frame.header.dlc),
-    };
-    if (message.size > sizeof(message.payload)) {
-        return false;
-    }
-    for (unsigned i = 0; i < message.size; ++i) {
-        message.payload[i] = payload[i];
-    }
-
-    BaseType_t task_woken = pdFALSE;
-    (void)xQueueSendFromISR(s_can_rx_queue, &message, &task_woken);
-    return task_woken == pdTRUE;
-}
 
 static uint32_t now_ms(void)
 {
     return (uint32_t)(esp_timer_get_time() / 1000u);
 }
 
-static esp_err_t radio_init(const ugv_esp32_board_config_t *board)
+static esp_err_t uart_link_init(uart_port_t port, gpio_num_t tx,
+                                gpio_num_t rx, uint32_t baud_rate)
 {
     const uart_config_t config = {
-        .baud_rate = (int)UGV_CRSF_BAUD_RATE,
+        .baud_rate = (int)baud_rate,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
@@ -94,69 +65,90 @@ static esp_err_t radio_init(const ugv_esp32_board_config_t *board)
         .source_clk = UART_SCLK_DEFAULT,
     };
 
-    ESP_RETURN_ON_ERROR(uart_param_config(RC_UART, &config), TAG,
-                        "CRSF UART configuration failed");
-    ESP_RETURN_ON_ERROR(uart_set_pin(RC_UART, board->crsf_tx, board->crsf_rx,
-                                     UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE),
-                        TAG, "CRSF UART pin configuration failed");
-    return uart_driver_install(RC_UART, 1024, 0, 0, NULL, 0);
+    if (uart_is_driver_installed(port)) {
+        ESP_RETURN_ON_ERROR(uart_driver_delete(port), TAG,
+                            "UART driver reset failed");
+    }
+    ESP_RETURN_ON_ERROR(uart_param_config(port, &config), TAG,
+                        "UART configuration failed");
+    ESP_RETURN_ON_ERROR(uart_set_pin(port, tx, rx, UART_PIN_NO_CHANGE,
+                                     UART_PIN_NO_CHANGE), TAG,
+                        "UART pin configuration failed");
+    return uart_driver_install(port, 1024, 0, 0, NULL, 0);
 }
 
-static esp_err_t can_init(const ugv_esp32_board_config_t *board)
+static esp_err_t radio_init(const ugv_esp32_board_config_t *board)
 {
-    const twai_onchip_node_config_t config = {
-        .io_cfg = {
-            .tx = board->can_tx,
-            .rx = board->can_rx,
-            .quanta_clk_out = GPIO_NUM_NC,
-            .bus_off_indicator = GPIO_NUM_NC,
-        },
-        .bit_timing = {
-            .bitrate = UGV_CAN_BITRATE_BPS,
-        },
-        .fail_retry_cnt = 1,
-        .tx_queue_depth = 8u,
-    };
-
-    s_can_rx_queue = xQueueCreate(16u, sizeof(can_rx_message_t));
-    ESP_RETURN_ON_FALSE(s_can_rx_queue != NULL, ESP_ERR_NO_MEM, TAG,
-                        "TWAI RX queue allocation failed");
-    ESP_RETURN_ON_ERROR(twai_new_node_onchip(&config, &s_twai_node), TAG,
-                        "TWAI node creation failed");
-    const twai_event_callbacks_t callbacks = {
-        .on_rx_done = can_rx_done,
-    };
-    ESP_RETURN_ON_ERROR(twai_node_register_event_callbacks(
-                            s_twai_node, &callbacks, NULL),
-                        TAG, "TWAI callback registration failed");
-    return twai_node_enable(s_twai_node);
+    return uart_link_init(RC_UART, board->crsf_tx, board->crsf_rx,
+                          UGV_CRSF_BAUD_RATE);
 }
 
-static void process_can_telemetry(motor_telemetry_t *telemetry,
-                                  uint32_t current_ms)
+static bool motor_link_send(motor_link_t *link,
+                            const ugv_manual_control_t *control,
+                            const int16_t rpm[3], uint8_t enable_mask)
 {
-    can_rx_message_t message;
-    while (xQueueReceive(s_can_rx_queue, &message, 0) == pdTRUE) {
-        unsigned side;
-        if (message.identifier == UGV_CAN_MSG_TELEMETRY_LEFT) {
-            side = 0u;
-        } else if (message.identifier == UGV_CAN_MSG_TELEMETRY_RIGHT) {
-            side = 1u;
-        } else {
-            continue;
-        }
+    uint8_t payload[UGV_UART_CONTROL_PAYLOAD_SIZE];
+    uint8_t frame[UGV_UART_MAX_FRAME_SIZE];
+    const ugv_uart_control_t message = {
+        .target_role = link->node_role,
+        .enabled_mask = control->armed ? enable_mask : 0u,
+        .flags = (control->armed ? UGV_UART_CONTROL_FLAG_ARM : 0u) |
+                 (control->emergency_stop_latched
+                      ? UGV_UART_CONTROL_FLAG_ESTOP : 0u),
+        .front_rpm = control->armed ? rpm[0] : 0,
+        .center_rpm = control->armed ? rpm[1] : 0,
+        .rear_rpm = control->armed ? rpm[2] : 0,
+    };
+    if (!ugv_uart_encode_control(payload, sizeof(payload), &message)) {
+        return false;
+    }
+    const size_t frame_size = ugv_uart_encode_frame(
+        frame, sizeof(frame), UGV_UART_MSG_CONTROL, link->tx_sequence++,
+        payload, sizeof(payload));
+    const bool sent = frame_size != 0u &&
+        uart_write_bytes(link->port, frame, frame_size) == (int)frame_size;
+    if (sent) {
+        link->control_tx_count++;
+    } else {
+        link->control_tx_fail_count++;
+    }
+    return sent;
+}
 
-        ugv_can_motor_telemetry_t decoded;
-        if (!ugv_can_decode_motor_telemetry(&decoded, message.payload,
-                                            message.size)) {
-            continue;
+static void motor_link_receive(motor_link_t *link,
+                               motor_telemetry_t *telemetry,
+                               uint32_t current_ms)
+{
+    uint8_t bytes[64];
+    int received;
+    while ((received = uart_read_bytes(link->port, bytes, sizeof(bytes), 0)) > 0) {
+        for (int index = 0; index < received; ++index) {
+            ugv_uart_frame_t frame;
+            if (!ugv_uart_parser_push(&link->parser, bytes[index], &frame) ||
+                frame.type != UGV_UART_MSG_TELEMETRY) {
+                continue;
+            }
+            ugv_uart_telemetry_t decoded;
+            if (!ugv_uart_decode_telemetry(&decoded, frame.payload,
+                                           frame.payload_size) ||
+                decoded.node_role != link->node_role) {
+                continue;
+            }
+            const unsigned side = link->node_role == UGV_NODE_CODE_LEFT ? 0u : 1u;
+            const unsigned offset = side * 3u;
+            telemetry->rpm[offset] = decoded.front_rpm;
+            telemetry->rpm[offset + 1u] = decoded.center_rpm;
+            telemetry->rpm[offset + 2u] = decoded.rear_rpm;
+            telemetry->received_ms[side] = current_ms;
+            telemetry->frame_count[side]++;
+            telemetry->safety_state[side] = decoded.safety_state;
+            telemetry->fault_mask[side] = decoded.fault_mask;
+            telemetry->valid_mask[side] = decoded.valid_mask;
+            telemetry->control_rx_count[side] = decoded.control_rx_count;
+            telemetry->last_control_flags[side] = decoded.last_control_flags;
+            telemetry->last_enabled_mask[side] = decoded.last_enabled_mask;
+            telemetry->side_seen[side] = true;
         }
-        const unsigned offset = side * 3u;
-        telemetry->rpm[offset] = decoded.front_rpm;
-        telemetry->rpm[offset + 1u] = decoded.center_rpm;
-        telemetry->rpm[offset + 2u] = decoded.rear_rpm;
-        telemetry->received_ms[side] = current_ms;
-        telemetry->side_seen[side] = true;
     }
 }
 
@@ -174,126 +166,137 @@ static bool radio_send_rpm_side(const motor_telemetry_t *telemetry,
     return size > 0u && uart_write_bytes(RC_UART, frame, size) == (int)size;
 }
 
-static bool can_send(uint16_t identifier, const uint8_t *payload, uint8_t size)
+static uint16_t as_u16_saturated(uint32_t value)
 {
-    if (payload == NULL || size > 8u) {
-        return false;
-    }
-
-    twai_node_status_t status;
-    if (twai_node_get_info(s_twai_node, &status, NULL) != ESP_OK) {
-        return false;
-    }
-    if (status.state == TWAI_ERROR_BUS_OFF) {
-        if (!s_twai_recovering &&
-            twai_node_recover(s_twai_node) == ESP_OK) {
-            s_twai_recovering = true;
-            ESP_LOGW(TAG, "TWAI bus-off; recovery started");
-        }
-        return false;
-    }
-    if (status.state == TWAI_ERROR_ACTIVE && s_twai_recovering) {
-        s_twai_recovering = false;
-        ESP_LOGI(TAG, "TWAI bus recovered");
-    }
-
-    if (s_twai_tx_pending) {
-        if (twai_node_transmit_wait_all_done(s_twai_node, 0) != ESP_OK) {
-            return false;
-        }
-        s_twai_tx_pending = false;
-    }
-
-    memcpy(s_twai_tx_payload, payload, size);
-    s_twai_tx_frame = (twai_frame_t){
-        .header.id = identifier,
-        .buffer = s_twai_tx_payload,
-        .buffer_len = size,
-    };
-    if (twai_node_transmit(s_twai_node, &s_twai_tx_frame, 2) != ESP_OK) {
-        return false;
-    }
-    s_twai_tx_pending = true;
-    if (twai_node_transmit_wait_all_done(s_twai_node, 5) != ESP_OK) {
-        return false;
-    }
-    s_twai_tx_pending = false;
-    return true;
+    return value > UINT16_MAX ? UINT16_MAX : (uint16_t)value;
 }
 
-static bool send_control_frames(const ugv_manual_control_t *control,
-                                uint8_t *sequence)
+static int16_t normalized_as_per_mille(float value)
 {
-    uint8_t payload[8] = {0};
-    const uint8_t current_sequence = (*sequence)++;
-    const ugv_can_wheel_targets_t left = {
-        .sequence = current_sequence,
-        .enabled_mask = control->armed ? control->left_enable_mask : 0u,
-        .front_rpm = control->armed ? control->left_rpm[0] : 0,
-        .center_rpm = control->armed ? control->left_rpm[1] : 0,
-        .rear_rpm = control->armed ? control->left_rpm[2] : 0,
-    };
-    const ugv_can_wheel_targets_t right = {
-        .sequence = current_sequence,
-        .enabled_mask = control->armed ? control->right_enable_mask : 0u,
-        .front_rpm = control->armed ? control->right_rpm[0] : 0,
-        .center_rpm = control->armed ? control->right_rpm[1] : 0,
-        .rear_rpm = control->armed ? control->right_rpm[2] : 0,
-    };
-    const ugv_can_system_enable_t enable = {
-        .enabled = control->armed ? 1u : 0u,
-        .emergency_stop = control->emergency_stop_latched ? 1u : 0u,
-    };
+    if (value > 1.0f) value = 1.0f;
+    if (value < -1.0f) value = -1.0f;
+    return (int16_t)(value * 1000.0f);
+}
 
-    bool ok = ugv_can_encode_wheel_targets(payload, sizeof(payload), &left) &&
-              can_send(UGV_CAN_MSG_WHEEL_TARGETS_LEFT, payload,
-                       UGV_CAN_WHEEL_TARGETS_LEFT_DLC);
-    memset(payload, 0, sizeof(payload));
-    ok = ugv_can_encode_wheel_targets(payload, sizeof(payload), &right) &&
-         can_send(UGV_CAN_MSG_WHEEL_TARGETS_RIGHT, payload,
-                  UGV_CAN_WHEEL_TARGETS_RIGHT_DLC) && ok;
-    memset(payload, 0, sizeof(payload));
-    ok = ugv_can_encode_system_enable(payload, sizeof(payload), &enable) &&
-         can_send(UGV_CAN_MSG_SYSTEM_ENABLE, payload,
-                  UGV_CAN_SYSTEM_ENABLE_DLC) && ok;
+static ugv_crsf_link_diagnostic_t link_diagnostic(
+    const motor_link_t *link, const motor_telemetry_t *telemetry,
+    unsigned side, uint32_t current_ms)
+{
+    const uint32_t age = telemetry->side_seen[side]
+        ? current_ms - telemetry->received_ms[side]
+        : UINT16_MAX;
+    return (ugv_crsf_link_diagnostic_t) {
+        .control_tx_count = link->control_tx_count,
+        .control_tx_fail_count = as_u16_saturated(
+            link->control_tx_fail_count),
+        .telemetry_rx_count = telemetry->frame_count[side],
+        .telemetry_age_ms = as_u16_saturated(age),
+        .uart_crc_error_count = as_u16_saturated(
+            link->parser.crc_error_count),
+        .uart_format_error_count = as_u16_saturated(
+            link->parser.format_error_count),
+        .safety_state = telemetry->safety_state[side],
+        .fault_mask = telemetry->fault_mask[side],
+        .valid_mask = telemetry->valid_mask[side],
+        .control_rx_count = telemetry->control_rx_count[side],
+        .last_control_flags = telemetry->last_control_flags[side],
+        .last_enabled_mask = telemetry->last_enabled_mask[side],
+    };
+}
 
-    return ok;
+static bool radio_send_diagnostic(
+    const ugv_crsf_receiver_t *radio, const ugv_manual_control_t *control,
+    const motor_link_t *left_link, const motor_link_t *right_link,
+    const motor_telemetry_t *telemetry, uint32_t current_ms)
+{
+    const ugv_crsf_diagnostic_t diagnostic = {
+        .flags = (control->link_up ? UGV_CRSF_DIAG_FLAG_RF_LINK : 0u) |
+                 (control->armed ? UGV_CRSF_DIAG_FLAG_ARMED : 0u) |
+                 (control->emergency_stop_latched
+                      ? UGV_CRSF_DIAG_FLAG_ESTOP : 0u),
+        .drive_mode = control->drive_mode,
+        .throttle_per_mille = normalized_as_per_mille(control->throttle),
+        .steering_per_mille = normalized_as_per_mille(control->steering),
+        .crsf_channel_frame_count = radio->channel_frame_count,
+        .crsf_crc_error_count = as_u16_saturated(radio->crc_error_count),
+        .left = link_diagnostic(left_link, telemetry, 0u, current_ms),
+        .right = link_diagnostic(right_link, telemetry, 1u, current_ms),
+    };
+    uint8_t frame[64];
+    const size_t size = ugv_crsf_build_diagnostic_frame(
+        frame, sizeof(frame), &diagnostic);
+    return size > 0u && uart_write_bytes(RC_UART, frame, size) == (int)size;
 }
 
 void app_main(void)
 {
     const ugv_esp32_board_config_t *board = ugv_esp32_board_config();
-    ESP_LOGI(TAG, "UGV manual control booting");
-    ESP_LOGI(TAG, "CRSF manual drive mode, max=%.0f RPM",
-             (double)UGV_RC_MAX_RPM);
-    ESP_LOGI(TAG, "TWAI TX=%d RX=%d at %u bit/s",
-             board->can_tx, board->can_rx, UGV_CAN_BITRATE_BPS);
+    ESP_LOGI(TAG, "UGV dual-UART manual control booting");
+    ESP_LOGI(TAG, "LEFT UART TX=%d RX=%d, RIGHT UART TX=%d RX=%d at %u baud",
+             board->left_uart_tx, board->left_uart_rx,
+             board->right_uart_tx, board->right_uart_rx, UGV_UART_BAUD_RATE);
     ESP_LOGI(TAG, "CRSF TX=%d RX=%d at %u baud",
              board->crsf_tx, board->crsf_rx, UGV_CRSF_BAUD_RATE);
 
     ESP_ERROR_CHECK(radio_init(board));
-    ESP_ERROR_CHECK(can_init(board));
+
+    /* UART0 is the left motor link at runtime. Disable application logs before
+     * remapping it so text can never corrupt binary motor commands. The ESP
+     * ROM downloader still uses GPIO43/44 before this application starts. */
+    esp_log_level_set("*", ESP_LOG_NONE);
+    ESP_ERROR_CHECK(uart_link_init(LEFT_MOTOR_UART, board->left_uart_tx,
+                                   board->left_uart_rx, UGV_UART_BAUD_RATE));
+    ESP_ERROR_CHECK(uart_link_init(RIGHT_MOTOR_UART, board->right_uart_tx,
+                                   board->right_uart_rx, UGV_UART_BAUD_RATE));
+
+#if FORCE_STM32_UPDATER_ON_BOOT
+    /* Temporary service image. Enter only after UART0/UART2 have reached the
+     * same initialized state used by the normal long-press path. */
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    stm32_uart_updater_run(board);
+#endif
+
+    motor_link_t left_link = {
+        .port = LEFT_MOTOR_UART,
+        .node_role = UGV_NODE_CODE_LEFT,
+    };
+    motor_link_t right_link = {
+        .port = RIGHT_MOTOR_UART,
+        .node_role = UGV_NODE_CODE_RIGHT,
+    };
+    ugv_uart_parser_init(&left_link.parser);
+    ugv_uart_parser_init(&right_link.parser);
 
     ugv_crsf_receiver_t radio;
     ugv_crsf_init(&radio);
     ugv_manual_control_t control;
     ugv_manual_control_init(&control);
-    uint8_t can_sequence = 0u;
-    uint32_t last_control_ms = 0u;
-    uint32_t last_log_ms = 0u;
-    uint32_t can_tx_errors = 0u;
-    uint32_t last_rpm_radio_ms = 0u;
-    unsigned rpm_radio_side = 0u;
     motor_telemetry_t telemetry = {0};
+    uint32_t last_control_ms = 0u;
+    uint32_t last_rpm_radio_ms = 0u;
+    uint32_t last_diagnostic_radio_ms = 0u;
+    unsigned rpm_radio_side = 0u;
     uint8_t rx[128];
+    uint32_t update_button_pressed_ms = 0u;
+
+    const gpio_config_t update_button = {
+        .pin_bit_mask = 1ULL << UPDATE_BUTTON_GPIO,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    ESP_ERROR_CHECK(gpio_config(&update_button));
 
     while (true) {
         const int received = uart_read_bytes(RC_UART, rx, sizeof(rx),
                                              pdMS_TO_TICKS(2));
         const uint32_t current_ms = now_ms();
-        process_can_telemetry(&telemetry, current_ms);
-        for (int i = 0; i < received; ++i) {
-            const ugv_crsf_event_t event = ugv_crsf_push_byte(&radio, rx[i]);
+        motor_link_receive(&left_link, &telemetry, current_ms);
+        motor_link_receive(&right_link, &telemetry, current_ms);
+
+        for (int index = 0; index < received; ++index) {
+            const ugv_crsf_event_t event = ugv_crsf_push_byte(&radio, rx[index]);
             if ((event & UGV_CRSF_EVENT_CHANNELS) != 0u) {
                 ugv_manual_control_note_channels(&control, current_ms);
             }
@@ -301,19 +304,37 @@ void app_main(void)
                 ugv_manual_control_note_link_stats(&control, current_ms);
             }
         }
-
-        const bool was_armed = control.armed;
         ugv_manual_control_update(&control, &radio, current_ms);
-        if (control.armed && !was_armed) {
-            ESP_LOGI(TAG, "ARMED");
-        } else if (!control.armed && was_armed) {
-            ESP_LOGW(TAG, "DISARMED");
-        }
-        if ((current_ms - last_control_ms) >= CONTROL_PERIOD_MS) {
-            last_control_ms = current_ms;
-            if (!send_control_frames(&control, &can_sequence)) {
-                can_tx_errors++;
+
+        if (gpio_get_level(UPDATE_BUTTON_GPIO) == 0) {
+            if (update_button_pressed_ms == 0u) {
+                update_button_pressed_ms = current_ms;
+            } else if ((current_ms - update_button_pressed_ms) >=
+                       UPDATE_BUTTON_HOLD_MS) {
+                /* Send explicit DISARM frames before UART0 leaves the left
+                 * motor link. Both STM32 nodes remain fail-safe throughout
+                 * maintenance mode. */
+                control.armed = false;
+                control.emergency_stop_latched = false;
+                for (unsigned attempt = 0u; attempt < 20u; ++attempt) {
+                    (void)motor_link_send(&left_link, &control,
+                                          control.left_rpm, 0u);
+                    (void)motor_link_send(&right_link, &control,
+                                          control.right_rpm, 0u);
+                    vTaskDelay(pdMS_TO_TICKS(20));
+                }
+                stm32_uart_updater_run(board);
             }
+        } else {
+            update_button_pressed_ms = 0u;
+        }
+
+        if ((current_ms - last_control_ms) >= UGV_UART_COMMAND_PERIOD_MS) {
+            last_control_ms = current_ms;
+            (void)motor_link_send(&left_link, &control, control.left_rpm,
+                                  control.left_enable_mask);
+            (void)motor_link_send(&right_link, &control, control.right_rpm,
+                                  control.right_enable_mask);
         }
 
         if ((current_ms - last_rpm_radio_ms) >= RPM_RADIO_PERIOD_MS) {
@@ -321,31 +342,13 @@ void app_main(void)
             (void)radio_send_rpm_side(&telemetry, rpm_radio_side, current_ms);
             rpm_radio_side ^= 1u;
         }
-
-        if ((current_ms - last_log_ms) >= STATUS_LOG_PERIOD_MS) {
-            last_log_ms = current_ms;
-            ESP_LOGI(TAG,
-                     "RC=%s ARM=%s ESTOP=%s MODE=DRIVE/%u CH1=%u CH2=%u CH3=%u CH5=%u CH6=%u steer=%.2f throttle=%.2f L=%d/%d/%d(%02x) R=%d/%d/%d(%02x) LQ=%u CANerr=%lu CRCerr=%lu",
-                     control.link_up ? "OK" : "LOST",
-                     control.armed ? "ON" : "OFF",
-                     control.emergency_stop_latched ? "ON" : "OFF",
-                     control.drive_mode,
-                     radio.channels[UGV_RC_STEERING_CHANNEL],
-                     radio.channels[UGV_RC_THROTTLE_CHANNEL],
-                     radio.channels[UGV_RC_DRIVE_MODE_CHANNEL],
-                     radio.channels[UGV_RC_ARM_CHANNEL],
-                     radio.channels[UGV_RC_ESTOP_CHANNEL],
-                     (double)control.steering, (double)control.throttle,
-                     control.left_rpm[0], control.left_rpm[1],
-                     control.left_rpm[2], control.left_enable_mask,
-                     control.right_rpm[0], control.right_rpm[1],
-                     control.right_rpm[2], control.right_enable_mask,
-                     radio.link_quality_pct, (unsigned long)can_tx_errors,
-                     (unsigned long)radio.crc_error_count);
+        if ((current_ms - last_diagnostic_radio_ms) >=
+            DIAGNOSTIC_RADIO_PERIOD_MS) {
+            last_diagnostic_radio_ms = current_ms;
+            (void)radio_send_diagnostic(
+                &radio, &control, &left_link, &right_link,
+                &telemetry, current_ms);
         }
-        /* The default ESP-IDF tick is coarser than 1 ms, so pdMS_TO_TICKS(1)
-         * can become zero and starve IDLE0. One scheduler tick still keeps
-         * the 20 ms control cadence and guarantees watchdog idle time. */
         vTaskDelay(1);
     }
 }

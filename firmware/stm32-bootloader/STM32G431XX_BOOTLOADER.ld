@@ -7,7 +7,7 @@
 **  Author		: STM32CubeMX
 **
 **  Abstract    : Linker script for STM32G431CBTx series
-**                immutable 24 KiB UGV CAN bootloader region
+**                immutable 24 KiB UGV UART bootloader region
 **
 **                Set heap size, stack size and stack location according
 **                to application requirements.

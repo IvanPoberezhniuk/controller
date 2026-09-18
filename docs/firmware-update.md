@@ -1,163 +1,91 @@
-# STM32 firmware update without ST-Link
+# Firmware update
 
-The two motor nodes use a small, role-specific CAN bootloader. ST-Link is not
-required in normal operation. A blank STM32 must first receive the bootloader
-once through the factory ROM USART2 bootloader; all later application updates
-come from a temporary Linux/SocketCAN service host over Classic CAN at
-500 kbit/s. The vehicle Raspberry Pi remains Wi-Fi-only and is not used for
-this maintenance connection.
+## Persistent UART bootloader
 
-The STM32G431 system-memory bootloader does not support FDCAN, so a completely
-blank MCU cannot be provisioned directly through CAN. The custom bootloader in
-this repository adds that capability after the one-time UART step.
-
-## What is built
-
-Run from the repository root on the development PC:
+Each STM32 can be provisioned once over ST-Link with an immutable 24 KiB
+bootloader, an application linked at `0x08006000`, and CRC-protected metadata:
 
 ```powershell
-.\tools\build-update-images.ps1
+.\tools\install-stm32-uart-bootloader.ps1 -Node Left
+.\tools\install-stm32-uart-bootloader.ps1 -Node Right
 ```
 
-The final FDCAN/TIM8/common-enable pinout is already generated and is always
-used by this command. The outputs are:
+The bootloader uses the existing 115200-baud USART2 link (`PA2` TX, `PA3` RX)
+to the ESP32. It always forces all six PWM pins and all three common BTS enable
+nets low before checking or updating flash. A running application accepts the
+bootloader-entry command only while its outputs are already safe (`DISABLED`,
+`FAULT`, or `EMERGENCY_STOP`) and only with the update magic value, then
+disables every motor output before reset.
 
-| Node | One-time image at `0x08000000` | CAN application image |
-| --- | --- | --- |
-| Left | `build/stm32-left-bootloader-release/UGV_BOOTLOADER_LEFT.bin` | `build/stm32-left-ota-release/UGV_STM32_LEFT.bin` |
-| Right | `build/stm32-right-bootloader-release/UGV_BOOTLOADER_RIGHT.bin` | `build/stm32-right-ota-release/UGV_STM32_RIGHT.bin` |
+The application occupies `0x08006000..0x0801F7FF`; the final 2 KiB flash page
+at `0x0801F800` stores image size, role, generation, and CRC-32. Metadata is
+invalidated before an erase and committed only after the complete image and
+vector table verify. An interrupted update therefore stays in recovery mode
+instead of executing a partial image.
 
-Never interchange Left and Right bootloaders or applications. The node identity
-selects different CAN data/status identifiers and is also stored in the image
-metadata. A normal `stm32-*-release` application is linked at `0x08000000` and
-is not a valid OTA image; the SocketCAN updater rejects it.
+Before jumping to a valid application, the bootloader disables and clears all
+pending NVIC sources, relocates `VTOR`, installs the application's main stack,
+and restores global interrupts (`PRIMASK=0`). Restoring `PRIMASK` is required:
+without it the application can transmit/poll peripherals but USART2 RX and all
+other interrupts remain globally blocked. The application also restores global
+interrupts after initializing its UART RX ring as a defensive second layer.
 
-## One-time provisioning through USB-UART
+The ESP32 firmware includes the STM32 UART image transport. Hold the ESP32
+`BOOT` button for approximately two seconds while the normal application is
+running to enter maintenance mode. Do not hold `BOOT` during ESP32 reset or
+power-up, because that selects the ESP32 ROM downloader instead. The PC sends
+the matching Left or Right OTA image through the ESP32 USB-UART connection;
+the ESP32 validates the image header, size, role, vector table, and CRC before
+forwarding it to the selected STM32.
 
-Use a 3.3 V USB-UART adapter. Do not use a 5 V logic-level adapter. Disconnect
-motor power and make sure every BTS7960 enable has a hardware pull-down before
-starting.
+With the ESP32 USB-UART bridge on `COM3`, start the host sender and then hold
+`BOOT` for approximately two seconds when prompted:
 
-| USB-UART / control | WeAct STM32G431 board | Color | Note |
-| --- | --- | --- | --- |
-| Adapter TX | `PA3 / USART2_RX` | White | Signals cross |
-| Adapter RX | `PA2 / USART2_TX` | Orange | Signals cross |
-| Adapter GND | `GND` | Black | Common reference |
-| BOOT control | Onboard `BOOT0` button | No wire | Hold only while entering the ROM bootloader; PB8 is not on the headers |
-| Reset control | Onboard `NRST` button | No wire | Tap while BOOT0 is held |
-
-Do not add a BOOT0 jumper or external PB8 pull-down to the WeAct board. Use its
-existing BOOT0-button circuit. The center motor LPWM is on exposed PA15/TIM8_CH1
-and is unrelated to boot selection.
-
-Provision each board separately:
-
-1. Disconnect the CAN transceiver or leave the CAN bus unpowered; disconnect
-   motor power.
-2. Connect TX, RX, and GND as shown above.
-3. Hold the onboard BOOT0 button, press and release NRST, then release BOOT0.
-4. In STM32CubeProgrammer select **UART**, 115200 8E1, and connect.
-5. Program the matching `UGV_BOOTLOADER_LEFT.bin` or
-   `UGV_BOOTLOADER_RIGHT.bin` at address `0x08000000`, then verify it.
-6. Disconnect CubeProgrammer and press NRST normally without holding BOOT0.
-7. The custom bootloader now keeps the motor outputs low and waits on CAN,
-   because no valid application metadata exists yet.
-
-USART2 is needed only for this first installation or deep recovery. SWD pads
-may remain on the PCB as optional debug/test points, but they are not part of
-the update path.
-
-## Temporary SocketCAN service connection
-
-Each STM32 and ESP32 uses its permanent SN65HVD230. To service firmware,
-connect an external Linux computer through a USB-CAN adapter that exposes a
-SocketCAN interface. This adapter is temporary and does not make the onboard
-Raspberry Pi a CAN node. Once Linux exposes `can0`, configure it:
-
-```bash
-sudo ip link set can0 down 2>/dev/null || true
-sudo ip link set can0 type can bitrate 500000 restart-ms 100
-sudo ip link set can0 up
-ip -details -statistics link show can0
+```powershell
+.\tools\update-stm32-via-esp.ps1 -Node Left -Port COM3
+.\tools\update-stm32-via-esp.ps1 -Node Right -Port COM3
 ```
 
-Copy `tools/ugv_can_update.py` and the required OTA `.bin` to that service
-computer, or run them from a checkout of this repository. The updater uses
-Python's standard library and Linux SocketCAN; it does not require
-`python-can`.
+## Direct SWD recovery
 
-For the first application immediately after UART provisioning, the node is
-already in the custom bootloader:
+For recovery or development **without** the persistent bootloader layout,
+flash each standalone STM32 application over SWD with the ST-Link V2 clone:
 
-```bash
-python3 tools/ugv_can_update.py \
-  --interface can0 --node left \
-  --image build/stm32-left-ota-release/UGV_STM32_LEFT.bin \
-  --no-enter
+```powershell
+.\tools\flash-left.ps1
+.\tools\flash-right.ps1
 ```
 
-Repeat with `--node right` and the Right image. For all later updates, while a
-valid application is running, omit `--no-enter`:
+Use the matching image for each physical side:
 
-```bash
-python3 tools/ugv_can_update.py \
-  --interface can0 --node left \
-  --image UGV_STM32_LEFT.bin
+| Board | Image |
+| --- | --- |
+| Left | `build/stm32-left-debug/UGV_STM32_LEFT.bin` |
+| Right | `build/stm32-right-debug/UGV_STM32_RIGHT.bin` |
+
+These standalone commands place the application at `0x08000000` and replace
+the persistent bootloader layout. For a board that should retain UART updates,
+use `install-stm32-uart-bootloader.ps1 -Node Left|Right` instead; it writes the
+bootloader, relocated application, and matching CRC metadata together.
+
+ST-Link wiring is `SWDIO→PA13`, `SWCLK→PA14`, `GND→GND`, and optionally
+`NRST→NRST`. If the vehicle's regulated 3.3 V rail powers the STM32, do not
+also connect the ST-Link 3.3 V output. Remove motor fuses or otherwise isolate
+12 V motor power while flashing.
+
+ESP32 is flashed through its onboard USB-UART bridge:
+
+```powershell
+. C:\esp\v6.0.2\esp-idf\export.ps1
+idf.py -C firmware\esp32 -p COM3 flash
 ```
 
-The running application accepts the bootloader request only while its control
-state is `DISABLED`, `FAULT`, or `ESTOP`. It first disables all drivers and
-zeros PWM, writes a reset request into reserved SRAM, then resets. Do not try to
-update a moving or enabled vehicle.
+The ESP application remaps UART0 to GPIO39/GPIO40 only after boot. The ROM
+downloader still uses GPIO43/GPIO44, so normal USB flashing remains available.
 
-## Update transaction and recovery
+## Legacy source
 
-```text
-Service host                running app / bootloader
-     |--- ENTER (0x600) ---> disable outputs, reset
-     |--- QUERY (0x600) ---> status READY/IDLE (0x680 or 0x681)
-     |--- BEGIN(size) -----> invalidate old metadata, erase app pages
-     |=== DATA, 6 B/frame => ACK every 32 frames
-     |--- FINISH(CRC-32) -> verify vectors + complete flash CRC
-     |<-- VERIFIED -------- commit metadata last
-     |--- ACTIVATE -------> reset and start application
-```
-
-Firmware data uses `0x610` for Left and `0x611` for Right. Status uses `0x680`
-and `0x681`. Frames contain a sequence number; duplicates are acknowledged and
-gaps return the next expected sequence. The service host queries progress and
-retries a window after a lost ACK.
-
-If power or CAN is lost after `BEGIN`, valid metadata has already been erased.
-The bootloader will not jump into a partial image and will wait on CAN after the
-next reset. Restore power/bus and rerun the matching update with `--no-enter`.
-The current design does not keep a second application slot, so the previous
-application is not available for rollback.
-
-## Flash map
-
-| Region | Address | Size | Purpose |
-| --- | ---: | ---: | --- |
-| Custom bootloader | `0x08000000` | 24 KiB | Safe boot, FDCAN receiver, flash writer |
-| Application | `0x08006000` | up to 102 KiB | Left or Right motor firmware |
-| Metadata page | `0x0801F800` | 2 KiB | Node, size, CRC-32, generation, header CRC |
-| Boot request | `0x20007FF8` | 8 B SRAM | Magic plus complement across software reset |
-
-The metadata magic is programmed last, only after the exact image size, vector
-table, and CRC-32 have been verified. On every cold boot the bootloader checks
-the metadata, stack/reset vectors, node identity, and complete application
-CRC before jumping.
-
-## Bench acceptance checklist
-
-- Motor supply disconnected; all three common-enable nets measure low during reset
-  and while the bootloader waits.
-- Power-off CAN-H to CAN-L resistance is approximately 60 ohm with exactly two
-  120 ohm end terminators.
-- `ip -details link show can0` reports 500000 bit/s and no rapidly increasing
-  bus errors.
-- Left update receives only `0x680`; Right update receives only `0x681`.
-- Interrupting an update, resetting, and rerunning with `--no-enter` recovers.
-- A wrong-role or normal-address `.bin` is rejected and is never activated.
-- After activation, the application remains disabled until a fresh explicit
-  enable command arrives.
+`tools/ugv_can_update.py` and `firmware/stm32-bootloader/Platform/Src/ugv_boot_can.c`
+are retained as legacy CAN references only. The active bootloader transport is
+UART. The shared update state machine, CRC, flash writer, and metadata format
+remain transport-independent.

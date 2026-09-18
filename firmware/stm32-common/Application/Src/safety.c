@@ -4,7 +4,7 @@
 #include "encoder.h"
 #include "fault_manager.h"
 #include "board.h"
-#include "ugv_can_protocol.h"
+#include "ugv_uart_protocol.h"
 
 static safety_state_t s_state;
 static uint32_t s_last_command_tick_ms;
@@ -84,7 +84,7 @@ void safety_request_disarm(void)
 
 void safety_set_motor_enable_mask(uint8_t mask)
 {
-    s_motor_enable_mask = mask & UGV_CAN_WHEEL_ENABLE_ALL;
+    s_motor_enable_mask = mask & UGV_WHEEL_ENABLE_ALL;
 }
 
 void safety_request_emergency_stop(void)

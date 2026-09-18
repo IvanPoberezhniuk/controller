@@ -124,11 +124,60 @@ static void test_rpm_telemetry_frame(void)
     assert(ugv_crsf_build_rpm_frame(frame, 5u, 0u, rpm, 3u) == 0u);
 }
 
+static void test_diagnostic_frame(void)
+{
+    const ugv_crsf_diagnostic_t diagnostic = {
+        .flags = UGV_CRSF_DIAG_FLAG_RF_LINK | UGV_CRSF_DIAG_FLAG_ARMED,
+        .drive_mode = 3u,
+        .throttle_per_mille = -125,
+        .steering_per_mille = 250,
+        .crsf_channel_frame_count = 0x12345678u,
+        .crsf_crc_error_count = 9u,
+        .left = {
+            .control_tx_count = 1000u,
+            .control_tx_fail_count = 2u,
+            .telemetry_rx_count = 90u,
+            .telemetry_age_ms = 25u,
+            .uart_crc_error_count = 3u,
+            .uart_format_error_count = 4u,
+            .safety_state = 4u,
+            .fault_mask = 0x02u,
+            .valid_mask = 0x77u,
+            .control_rx_count = 0x1234u,
+            .last_control_flags = 0x01u,
+            .last_enabled_mask = 0x07u,
+        },
+        .right = {
+            .control_tx_count = 2000u,
+            .telemetry_age_ms = UINT16_MAX,
+        },
+    };
+    uint8_t frame[64] = {0};
+    const size_t size = ugv_crsf_build_diagnostic_frame(
+        frame, sizeof(frame), &diagnostic);
+    assert(size == 64u);
+    assert(frame[0] == 0xc8u);
+    assert(frame[1] == 62u);
+    assert(frame[2] == UGV_CRSF_DIAGNOSTIC_FRAME_TYPE);
+    assert(memcmp(&frame[3], "UGV\x02", 4u) == 0);
+    assert(frame[7] == diagnostic.flags);
+    assert(frame[8] == diagnostic.drive_mode);
+    assert(frame[9] == 0x83u && frame[10] == 0xffu);
+    assert(frame[13] == 0x78u && frame[16] == 0x12u);
+    assert(frame[19] == 0xe8u && frame[22] == 0u);
+    assert(frame[38] == 0x34u);
+    assert(frame[39] == 0x01u);
+    assert(frame[40] == 0x07u);
+    assert(frame[63] == crc8_dvb_s2(&frame[2], 61u));
+    assert(ugv_crsf_build_diagnostic_frame(frame, 63u, &diagnostic) == 0u);
+}
+
 int main(void)
 {
     test_channels_and_normalization();
     test_link_statistics();
     test_rpm_telemetry_frame();
+    test_diagnostic_frame();
     puts("all CRSF tests passed");
     return 0;
 }

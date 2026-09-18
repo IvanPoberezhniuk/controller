@@ -9,13 +9,14 @@ set(STM32_HAL_DIR "${STM32_COMMON_DIR}/Drivers/STM32G4xx_HAL_Driver")
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/main.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/ugv_bootloader.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Src/ugv_boot_can.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Src/ugv_boot_uart.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Src/ugv_boot_flash.c
     ${STM32_COMMON_DIR}/startup_stm32g431xx.s
     ${STM32_COMMON_DIR}/Core/Src/system_stm32g4xx.c
     ${STM32_HAL_DIR}/Src/stm32g4xx_hal.c
     ${STM32_HAL_DIR}/Src/stm32g4xx_hal_cortex.c
-    ${STM32_HAL_DIR}/Src/stm32g4xx_hal_fdcan.c
+    ${STM32_HAL_DIR}/Src/stm32g4xx_hal_uart.c
+    ${STM32_HAL_DIR}/Src/stm32g4xx_hal_uart_ex.c
     ${STM32_HAL_DIR}/Src/stm32g4xx_hal_flash.c
     ${STM32_HAL_DIR}/Src/stm32g4xx_hal_flash_ex.c
     ${STM32_HAL_DIR}/Src/stm32g4xx_hal_flash_ramfunc.c
@@ -26,6 +27,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/shared/update/ugv_crc32.c
     ${CMAKE_SOURCE_DIR}/shared/update/ugv_fw_update_protocol.c
     ${CMAKE_SOURCE_DIR}/shared/update/ugv_image_metadata.c
+    ${CMAKE_SOURCE_DIR}/shared/serial/ugv_uart_protocol.c
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -37,6 +39,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${STM32_COMMON_DIR}/Drivers/CMSIS/Device/ST/STM32G4xx/Include
     ${STM32_COMMON_DIR}/Drivers/CMSIS/Include
     ${CMAKE_SOURCE_DIR}/shared/can
+    ${CMAKE_SOURCE_DIR}/shared/serial
     ${CMAKE_SOURCE_DIR}/shared/update
 )
 
