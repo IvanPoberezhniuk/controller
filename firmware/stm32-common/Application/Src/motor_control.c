@@ -113,6 +113,14 @@ void motor_control_set_enabled(motor_index_t motor, bool enabled)
     s_state[motor].enabled = enabled;
     if (!enabled) {
         s_internal[motor].commanded_rpm = 0.0f;
+        /* A disabled motor's PID must not carry accumulated error into the
+         * next arm. Without this, a stall (target unreachable, e.g. a
+         * disconnected/blocked motor) winds the integral up to its clamp,
+         * and that residual then drives the motor at a nonzero steady-state
+         * output indefinitely on every future arm, even with target_rpm at
+         * zero, until the MCU is reset. */
+        s_state[motor].pid_integral = 0.0f;
+        s_state[motor].previous_error = 0.0f;
     }
 }
 
@@ -187,6 +195,17 @@ static void step_one(motor_index_t motor, float dt_s)
         st->pwm_command = 0.0f;
         hw_write_pwm(motor, 0.0f);
         return;
+    }
+
+    if (st->target_rpm == 0.0f) {
+        /* A standard PI controller cannot forget accumulated error on its
+         * own: once at rest, error stays at 0 and the integral simply holds
+         * whatever it wound up to, driving the motor at a nonzero
+         * steady-state output indefinitely even while armed with no
+         * commanded speed. Zero the target explicitly means "stop", so
+         * clear the integral rather than let stale windup fight that. */
+        st->pid_integral = 0.0f;
+        st->previous_error = 0.0f;
     }
 
     float pid_out = mm_pid_step(st->target_rpm, st->measured_rpm, dt_s,

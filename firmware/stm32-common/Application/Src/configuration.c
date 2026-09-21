@@ -23,7 +23,8 @@ static const ugv_config_t s_config = {
                                              * validated on the bench at 10/100/250 RPM */
     .max_target_rpm               = 333.0f,
     .accel_limit_rpm_per_s        = 100.0f, /* bench-conservative: 0->60 RPM in ~0.6s */
-    .decel_limit_rpm_per_s        = 200.0f,
+    .decel_limit_rpm_per_s        = 4440.0f, /* max_target_rpm / 0.075s: full-speed stop in
+                                               * ~75 ms once target reaches zero */
     .direction_change_coast_ms    = 100u,
     .encoder_counts_per_output_rev = 2640u, /* MEASURED on the bench (3 duty/speed points
                                               * against the datasheet 333 RPM no-load
