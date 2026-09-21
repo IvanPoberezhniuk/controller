@@ -9,6 +9,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include "ugv_bms_ble.h"
 #include "ugv_crsf.h"
 #include "ugv_esp32_board.h"
 #include "ugv_manual_control.h"
@@ -238,6 +239,11 @@ void app_main(void)
              board->crsf_tx, board->crsf_rx, UGV_CRSF_BAUD_RATE);
 
     ESP_ERROR_CHECK(radio_init(board));
+
+    /* BMS BLE link runs on its own NimBLE host task and never touches the
+     * UARTs above; main loop only ever reads its state via
+     * ugv_bms_ble_get_state(), never calls BLE APIs directly. */
+    ugv_bms_ble_start();
 
     /* UART0 is the left motor link at runtime. Disable application logs before
      * remapping it so text can never corrupt binary motor commands. The ESP
