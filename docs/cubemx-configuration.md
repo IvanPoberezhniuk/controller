@@ -23,7 +23,7 @@ incorrectly.
    the old PB1/PB11 enable outputs. PB8 is the onboard BOOT0-button signal and
    is not exposed on the WeAct board headers.
 4. Keep all six direct current-sense inputs. ADC2 must be a five-rank,
-   single-ended scan: rank1 PA6/IN3 front R_IS, rank2 PA7/IN4 front L_IS,
+   single-ended scan: rank1 PA6/IN3 front L_IS, rank2 PA7/IN4 front R_IS,
    rank3 PB2/IN12 rear R_IS, rank4 PA5/IN13 center L_IS, rank5 PA4/IN17 center
    R_IS. ADC1 remains one channel: PB12/IN11 rear L_IS. Use software trigger,
    non-continuous mode, EOC after each conversion, and start with 92.5-cycle
@@ -157,7 +157,7 @@ This five-rank scan is the final architecture and is already represented in
 
 | Field | Value | Why |
 |---|---|---|
-| Channels enabled | IN3 (PA6, motor0 R_IS), IN4 (PA7, motor0 L_IS), IN12 (PB2, motor2 R_IS), IN13 (PA5, motor1 L_IS), IN17 (PA4, motor1 R_IS) | These five current-sense pins all happened to route through ADC2 on this package (checked live in CubeMX rather than assumed). |
+| Channels enabled | IN3 (PA6, motor0 L_IS), IN4 (PA7, motor0 R_IS), IN12 (PB2, motor2 R_IS), IN13 (PA5, motor1 L_IS), IN17 (PA4, motor1 R_IS) | These five current-sense pins all happened to route through ADC2 on this package (checked live in CubeMX rather than assumed). |
 | Single-ended (not Differential) | Single-ended | Each current-sense pin is read as a ground-referenced voltage on this MCU input, not a differential pair. Caveat: this describes the ADC's input mode, not a guarantee about the BTS7960 module itself — the IS pin's actual sense network (resistor value, any filtering) is module-dependent and needs to be verified against the real board before trusting the ADC reading as a calibrated current value (`current_sense_scale_a_per_v` in `configuration.h` is still a placeholder for this reason). Differential mode was CubeMX's default for two of these channels (IN3, IN12) and had to be explicitly overridden to Single-ended — a real mistake caught and fixed mid-build. |
 | Scan Conversion Mode | Enabled | Required to sample more than one channel per ADC — steps through all enabled channels in Rank order each time a conversion is triggered. |
 | Number Of Conversion | 5 | Must match the channel count exactly, or the scan sequence doesn't cover everything. |

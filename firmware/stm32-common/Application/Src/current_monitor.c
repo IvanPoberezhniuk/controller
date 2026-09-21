@@ -12,12 +12,15 @@
 #define ADC1_DIRECT_CHANNEL_COUNT 1u
 
 /* Direct ADC2 scan order configured by CubeMX:
- * rank 1 PA6/front R_IS, rank 2 PA7/front L_IS,
+ * rank 1 PA6/front L_IS, rank 2 PA7/front R_IS,
  * rank 3 PB2/rear R_IS, rank 4 PA5/center L_IS,
- * rank 5 PA4/center R_IS. ADC1 rank 1 is PB12/rear L_IS. */
+ * rank 5 PA4/center R_IS. ADC1 rank 1 is PB12/rear L_IS.
+ * Front R_IS/L_IS are swapped versus the original PA6/PA7 assignment because
+ * the physical harness wires them the other way around from the documented
+ * default; the rank order below matches the as-built wiring. */
 enum {
-    ADC2_FRONT_RIS_RANK = 0,
-    ADC2_FRONT_LIS_RANK,
+    ADC2_FRONT_LIS_RANK = 0,
+    ADC2_FRONT_RIS_RANK,
     ADC2_REAR_RIS_RANK,
     ADC2_CENTER_LIS_RANK,
     ADC2_CENTER_RIS_RANK,

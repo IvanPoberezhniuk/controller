@@ -346,8 +346,8 @@ nets between different motors.
 
 | Motor | Driver signal | STM32 pin / ADC channel | Color | Status |
 | --- | --- | --- | --- | --- |
-| Front / motor0 | `R_IS` | `PA6 / ADC2_IN3` | White | FINAL |
-| Front / motor0 | `L_IS` | `PA7 / ADC2_IN4` | Gray | FINAL |
+| Front / motor0 | `L_IS` | `PA6 / ADC2_IN3` | White | FINAL |
+| Front / motor0 | `R_IS` | `PA7 / ADC2_IN4` | Gray | FINAL |
 | Center / motor1 | `R_IS` | `PA4 / ADC2_IN17` | White | FINAL |
 | Center / motor1 | `L_IS` | `PA5 / ADC2_IN13` | Gray | FINAL |
 | Rear / motor2 | `R_IS` | `PB2 / ADC2_IN12` | White | FINAL |
