@@ -221,11 +221,15 @@ static bool send_image(update_link_t *link, const uint8_t *image,
     const uint32_t frame_count =
         (image_size + UGV_FW_DATA_BYTES_PER_FRAME - 1u) /
         UGV_FW_DATA_BYTES_PER_FRAME;
+    unsigned no_progress_count = 0u;
     while ((uint32_t)sequence < frame_count) {
-        /* Stop-and-wait is intentionally used for field updates. The STM32
-         * programs its application flash from the same bank, so long bursts
-         * can overrun the polling UART receiver while the CPU is stalled. */
-        const uint32_t window_end = (uint32_t)sequence + 1u;
+        /* Keep bursts short: the STM32 programs its application flash from
+         * the same bank, so a large window can overrun its polling receiver. */
+        const uint16_t window_start = sequence;
+        const uint32_t window_end =
+            ((uint32_t)sequence + 4u < frame_count)
+                ? (uint32_t)sequence + 4u
+                : frame_count;
         while ((uint32_t)sequence < window_end) {
             ugv_fw_data_t data = {.sequence = sequence};
             memset(data.bytes, 0xff, sizeof(data.bytes));
@@ -275,8 +279,16 @@ static bool send_image(update_link_t *link, const uint8_t *image,
          * status already queued in the ESP UART driver. */
         uart_flush_input(link->port);
         const uint16_t acknowledged_sequence = (uint16_t)status.value;
-        if (acknowledged_sequence != sequence) {
+        if (acknowledged_sequence < window_start ||
+            acknowledged_sequence > sequence) {
             return false;
+        }
+        if (acknowledged_sequence == window_start) {
+            if (++no_progress_count >= UPDATE_ACK_RETRIES) {
+                return false;
+            }
+        } else {
+            no_progress_count = 0u;
         }
         sequence = acknowledged_sequence;
     }
@@ -286,11 +298,18 @@ static bool send_image(update_link_t *link, const uint8_t *image,
 static bool finish_update(update_link_t *link, uint32_t expected_crc)
 {
     ugv_fw_status_t status;
-    return send_command(link, UGV_FW_COMMAND_FINISH, expected_crc) &&
-           wait_status(link, &status, 5000u, true) &&
-           status.code == UGV_FW_STATUS_VERIFIED &&
-           status.value == expected_crc &&
-           send_command(link, UGV_FW_COMMAND_ACTIVATE, 0u);
+    if (!send_command(link, UGV_FW_COMMAND_FINISH, expected_crc) ||
+        !wait_status(link, &status, 5000u, true) ||
+        status.code != UGV_FW_STATUS_VERIFIED ||
+        status.value != expected_crc ||
+        !send_command(link, UGV_FW_COMMAND_ACTIVATE, 0u)) {
+        return false;
+    }
+
+    /* UART0 is reused for the left motor link and the PC USB bridge. Ensure
+     * ACTIVATE has physically left the FIFO before configure_uart() deletes
+     * the motor-link driver and remaps UART0 back to GPIO43/GPIO44. */
+    return uart_wait_tx_done(link->port, pdMS_TO_TICKS(1000)) == ESP_OK;
 }
 
 static bool perform_update(update_link_t *link, const uint8_t *image,

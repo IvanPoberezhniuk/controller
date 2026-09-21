@@ -127,7 +127,7 @@ try {
 
     $serial.Write($imageBytes, 0, $imageBytes.Length)
     [void](Wait-UpdaterLine -Expected @("BUFFERED") -TimeoutMs 35000)
-    [void](Wait-UpdaterLine -Expected @("OK STM32 updated") -TimeoutMs 180000)
+    [void](Wait-UpdaterLine -Expected @("OK STM32 updated") -TimeoutMs 600000)
     Write-Host "$Node STM32 update completed successfully."
 } finally {
     if ($serial.IsOpen) {
