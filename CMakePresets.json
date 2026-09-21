@@ -77,6 +77,24 @@
                 "UGV_FIRMWARE_KIND": "BOOTLOADER",
                 "UGV_LINKER_LAYOUT": "BOOTLOADER"
             }
+        },
+        {
+            "name": "stm32-left-selftest",
+            "inherits": "stm32-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "UGV_NODE_ROLE": "LEFT",
+                "UGV_BENCH_SELFTEST_SPIN_PERCENT": "25"
+            }
+        },
+        {
+            "name": "stm32-right-selftest",
+            "inherits": "stm32-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "UGV_NODE_ROLE": "RIGHT",
+                "UGV_BENCH_SELFTEST_SPIN_PERCENT": "25"
+            }
         }
     ],
     "buildPresets": [
@@ -111,6 +129,14 @@
         {
             "name": "stm32-right-bootloader-release",
             "configurePreset": "stm32-right-bootloader-release"
+        },
+        {
+            "name": "stm32-left-selftest",
+            "configurePreset": "stm32-left-selftest"
+        },
+        {
+            "name": "stm32-right-selftest",
+            "configurePreset": "stm32-right-selftest"
         }
     ]
 }

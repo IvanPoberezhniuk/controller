@@ -27,6 +27,11 @@ if(NOT UGV_FIRMWARE_KIND_UPPER STREQUAL "APPLICATION" AND
     message(FATAL_ERROR "UGV_FIRMWARE_KIND must be APPLICATION or BOOTLOADER")
 endif()
 
+set(UGV_BENCH_SELFTEST_SPIN_PERCENT "0" CACHE STRING
+    "Bench-only: nonzero makes the app immediately spin all three motors at \
+this percent of max_target_rpm, bypassing UART control and safety arming. \
+Never use outside a dedicated SWD-flashed bench-test image.")
+
 if(UGV_FIRMWARE_KIND_UPPER STREQUAL "BOOTLOADER")
     set(CMAKE_PROJECT_NAME "UGV_BOOTLOADER_${UGV_NODE_ROLE_UPPER}")
 else()

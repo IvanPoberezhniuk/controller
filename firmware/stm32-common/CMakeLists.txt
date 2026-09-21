@@ -52,6 +52,12 @@ else()
     )
 endif()
 
+if(NOT UGV_BENCH_SELFTEST_SPIN_PERCENT STREQUAL "0")
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
+        UGV_BENCH_SELFTEST_SPIN_PERCENT=${UGV_BENCH_SELFTEST_SPIN_PERCENT}
+    )
+endif()
+
 if(UGV_LINKER_LAYOUT STREQUAL "OTA_APP")
     # SystemInit relocates VTOR even when the application is launched directly
     # under a debugger rather than through the bootloader jump path.
