@@ -7,10 +7,11 @@
 #define UGV_NODE_ROLE_NAME       "right"
 #define UGV_NODE_ROLE_CODE       UGV_NODE_CODE_RIGHT
 
-/* Keep neutral defaults until motor and encoder polarity is measured. */
-#define UGV_MOTOR_FRONT_DIRECTION  (+1)
-#define UGV_MOTOR_CENTER_DIRECTION (+1)
-#define UGV_MOTOR_REAR_DIRECTION   (+1)
+/* Confirmed on the bench: forward throttle drove all three Right motors in
+ * reverse with (+1), so the sign is inverted here. */
+#define UGV_MOTOR_FRONT_DIRECTION  (-1)
+#define UGV_MOTOR_CENTER_DIRECTION (-1)
+#define UGV_MOTOR_REAR_DIRECTION   (-1)
 
 #define UGV_ENCODER_FRONT_DIRECTION  (+1)
 #define UGV_ENCODER_CENTER_DIRECTION (+1)
