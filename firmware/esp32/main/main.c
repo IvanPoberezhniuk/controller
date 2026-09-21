@@ -24,7 +24,6 @@ static const char *TAG = "ugv_control";
 #define DIAGNOSTIC_RADIO_PERIOD_MS 1000u
 #define UPDATE_BUTTON_GPIO GPIO_NUM_0
 #define UPDATE_BUTTON_HOLD_MS 2000u
-#define FORCE_STM32_UPDATER_ON_BOOT 0
 
 typedef struct {
     uart_port_t port;
@@ -248,13 +247,6 @@ void app_main(void)
                                    board->left_uart_rx, UGV_UART_BAUD_RATE));
     ESP_ERROR_CHECK(uart_link_init(RIGHT_MOTOR_UART, board->right_uart_tx,
                                    board->right_uart_rx, UGV_UART_BAUD_RATE));
-
-#if FORCE_STM32_UPDATER_ON_BOOT
-    /* Temporary service image. Enter only after UART0/UART2 have reached the
-     * same initialized state used by the normal long-press path. */
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    stm32_uart_updater_run(board);
-#endif
 
     motor_link_t left_link = {
         .port = LEFT_MOTOR_UART,
