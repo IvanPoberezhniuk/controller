@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cmake *)",
+      "Bash(cmake *)",
+      "PowerShell(. C:\\esp\\v6.0.2\\esp-idf\\export.ps1*)",
+      "PowerShell(idf.py -C \"F:\\ugv\\controller\\firmware\\esp32\" build*)",
+      "PowerShell(taskkill /IM UGVControlStation.exe /F*)",
+      "Bash(touch*)",
+      "Bash(ls*)",
+      "Bash(grep*)"
+    ]
+  }
+}
