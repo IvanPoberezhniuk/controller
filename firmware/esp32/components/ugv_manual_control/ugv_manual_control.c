@@ -7,6 +7,8 @@
 #define RC_ARM_HIGH_THRESHOLD   0.50f
 #define RC_ARM_NEUTRAL_LIMIT    0.08f
 
+#define UGV_MANUAL_CONTROL_WHEEL_COUNT 3u
+
 static void mix_drive(ugv_manual_control_t *control)
 {
     /* Match connectionApp's vehicle convention: positive steering accelerates
@@ -26,15 +28,15 @@ static void mix_drive(ugv_manual_control_t *control)
     const int16_t right_rpm = (int16_t)(right * UGV_RC_MAX_RPM);
 
     control->left_enable_mask = UGV_WHEEL_ENABLE_REAR;
-    if (control->drive_mode >= 2u) {
+    if (control->drive_mode >= UGV_DRIVE_MODE_4WD) {
         control->left_enable_mask |= UGV_WHEEL_ENABLE_CENTER;
     }
-    if (control->drive_mode >= 3u) {
+    if (control->drive_mode >= UGV_DRIVE_MODE_6WD) {
         control->left_enable_mask |= UGV_WHEEL_ENABLE_FRONT;
     }
     control->right_enable_mask = control->left_enable_mask;
 
-    for (unsigned wheel = 0; wheel < 3u; ++wheel) {
+    for (unsigned wheel = 0; wheel < UGV_MANUAL_CONTROL_WHEEL_COUNT; ++wheel) {
         const bool enabled = (control->left_enable_mask & (1u << wheel)) != 0u;
         control->left_rpm[wheel] = enabled ? left_rpm : 0;
         control->right_rpm[wheel] = enabled ? right_rpm : 0;
@@ -105,8 +107,8 @@ void ugv_manual_control_update(ugv_manual_control_t *control,
         radio, UGV_RC_THROTTLE_CHANNEL, RC_DEADBAND);
     const float drive_mode = ugv_crsf_channel_normalized(
         radio, UGV_RC_DRIVE_MODE_CHANNEL, 0.0f);
-    control->drive_mode = drive_mode < -0.5f ? 1u :
-                          drive_mode > 0.5f ? 3u : 2u;
+    control->drive_mode = drive_mode < -0.5f ? UGV_DRIVE_MODE_2WD :
+                          drive_mode > 0.5f ? UGV_DRIVE_MODE_6WD : UGV_DRIVE_MODE_4WD;
 
     const float arm = ugv_crsf_channel_normalized(
         radio, UGV_RC_ARM_CHANNEL, 0.0f);

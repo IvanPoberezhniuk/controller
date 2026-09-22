@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "../ugv_link_timing.h"
+
 /*
  * Platform-neutral Classic CAN wire contract. Multi-byte values are
  * little-endian and must be serialized with ugv_can_codec; never memcpy a C
@@ -16,8 +18,8 @@
 #define UGV_CAN_BITRATE_BPS             500000u
 #define UGV_CAN_COMMAND_PERIOD_MS_MIN   10u
 #define UGV_CAN_COMMAND_PERIOD_MS_MAX   20u
-#define UGV_CAN_COMMAND_TIMEOUT_MS      300u
-#define UGV_CAN_RC_LINK_TIMEOUT_MS      100u
+#define UGV_CAN_COMMAND_TIMEOUT_MS      UGV_LINK_COMMAND_TIMEOUT_MS
+#define UGV_CAN_RC_LINK_TIMEOUT_MS      UGV_LINK_RC_TIMEOUT_MS
 #define UGV_CAN_AUTO_REQUEST_TIMEOUT_MS 300u
 
 typedef enum {

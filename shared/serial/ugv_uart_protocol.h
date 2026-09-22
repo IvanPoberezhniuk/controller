@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "../ugv_link_timing.h"
+
 #define UGV_UART_BAUD_RATE              115200u
 #define UGV_UART_PROTOCOL_VERSION       1u
 #define UGV_UART_SYNC_0                 0xA5u
@@ -14,8 +16,8 @@
 #define UGV_UART_CONTROL_PAYLOAD_SIZE   9u
 #define UGV_UART_TELEMETRY_PAYLOAD_SIZE 26u
 #define UGV_UART_COMMAND_PERIOD_MS      20u
-#define UGV_UART_COMMAND_TIMEOUT_MS     300u
-#define UGV_RC_LINK_TIMEOUT_MS          100u
+#define UGV_UART_COMMAND_TIMEOUT_MS     UGV_LINK_COMMAND_TIMEOUT_MS
+#define UGV_RC_LINK_TIMEOUT_MS          UGV_LINK_RC_TIMEOUT_MS
 
 typedef enum {
     UGV_UART_MSG_CONTROL = 1,

@@ -48,7 +48,7 @@ static void test_explicit_neutral_arm_and_mixer(void)
     set_channel(&radio, UGV_RC_DRIVE_MODE_CHANNEL, CRSF_MAX);
     set_channel(&radio, UGV_RC_THROTTLE_CHANNEL, CRSF_MAX);
     fresh_update(&control, &radio, 3u);
-    assert(control.drive_mode == 3u);
+    assert(control.drive_mode == UGV_DRIVE_MODE_6WD);
     assert(control.left_enable_mask == UGV_WHEEL_ENABLE_ALL);
     assert(control.right_enable_mask == UGV_WHEEL_ENABLE_ALL);
     for (unsigned wheel = 0; wheel < 3u; ++wheel) {
@@ -81,7 +81,7 @@ static void test_drive_modes_control_each_wheel(void)
 
     set_channel(&radio, UGV_RC_DRIVE_MODE_CHANNEL, CRSF_MIN);
     fresh_update(&control, &radio, 2u);
-    assert(control.drive_mode == 1u);
+    assert(control.drive_mode == UGV_DRIVE_MODE_2WD);
     assert(control.left_enable_mask == UGV_WHEEL_ENABLE_REAR);
     assert(control.right_enable_mask == UGV_WHEEL_ENABLE_REAR);
     assert(control.left_rpm[0] == 0 && control.left_rpm[1] == 0 &&
@@ -89,7 +89,7 @@ static void test_drive_modes_control_each_wheel(void)
 
     set_channel(&radio, UGV_RC_DRIVE_MODE_CHANNEL, CRSF_CENTER);
     fresh_update(&control, &radio, 3u);
-    assert(control.drive_mode == 2u);
+    assert(control.drive_mode == UGV_DRIVE_MODE_4WD);
     assert(control.left_enable_mask ==
            (UGV_WHEEL_ENABLE_CENTER | UGV_WHEEL_ENABLE_REAR));
     assert(control.right_enable_mask ==
@@ -99,7 +99,7 @@ static void test_drive_modes_control_each_wheel(void)
 
     set_channel(&radio, UGV_RC_DRIVE_MODE_CHANNEL, CRSF_MAX);
     fresh_update(&control, &radio, 4u);
-    assert(control.drive_mode == 3u);
+    assert(control.drive_mode == UGV_DRIVE_MODE_6WD);
     assert(control.left_enable_mask == UGV_WHEEL_ENABLE_ALL);
     assert(control.right_enable_mask == UGV_WHEEL_ENABLE_ALL);
 }

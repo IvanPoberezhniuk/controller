@@ -17,6 +17,12 @@ enum {
 
 #define UGV_RC_MAX_RPM 200.0f
 
+typedef enum {
+    UGV_DRIVE_MODE_2WD = 1u,
+    UGV_DRIVE_MODE_4WD = 2u,
+    UGV_DRIVE_MODE_6WD = 3u,
+} ugv_drive_mode_t;
+
 typedef struct {
     bool link_up;
     bool armed;
