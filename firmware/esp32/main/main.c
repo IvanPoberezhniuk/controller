@@ -5,6 +5,7 @@
 #include "driver/gpio.h"
 #include "esp_check.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -23,6 +24,7 @@ static const char *TAG = "ugv_control";
 #define RIGHT_MOTOR_UART    UART_NUM_2
 #define RPM_RADIO_PERIOD_MS 200u
 #define DIAGNOSTIC_RADIO_PERIOD_MS 1000u
+#define BMS_RADIO_PERIOD_MS 2000u
 #define UPDATE_BUTTON_GPIO GPIO_NUM_0
 #define UPDATE_BUTTON_HOLD_MS 2000u
 
@@ -45,6 +47,8 @@ typedef struct {
     uint16_t control_rx_count[2];
     uint8_t last_control_flags[2];
     uint8_t last_enabled_mask[2];
+    uint32_t uptime_ms[2];
+    uint16_t stack_free_bytes[2];
     bool side_seen[2];
 } motor_telemetry_t;
 
@@ -147,6 +151,8 @@ static void motor_link_receive(motor_link_t *link,
             telemetry->control_rx_count[side] = decoded.control_rx_count;
             telemetry->last_control_flags[side] = decoded.last_control_flags;
             telemetry->last_enabled_mask[side] = decoded.last_enabled_mask;
+            telemetry->uptime_ms[side] = decoded.uptime_ms;
+            telemetry->stack_free_bytes[side] = decoded.stack_free_bytes;
             telemetry->side_seen[side] = true;
         }
     }
@@ -201,6 +207,8 @@ static ugv_crsf_link_diagnostic_t link_diagnostic(
         .control_rx_count = telemetry->control_rx_count[side],
         .last_control_flags = telemetry->last_control_flags[side],
         .last_enabled_mask = telemetry->last_enabled_mask[side],
+        .uptime_ms = telemetry->uptime_ms[side],
+        .stack_free_bytes = telemetry->stack_free_bytes[side],
     };
 }
 
@@ -221,10 +229,65 @@ static bool radio_send_diagnostic(
         .crsf_crc_error_count = as_u16_saturated(radio->crc_error_count),
         .left = link_diagnostic(left_link, telemetry, 0u, current_ms),
         .right = link_diagnostic(right_link, telemetry, 1u, current_ms),
+        .esp_uptime_ms = current_ms,
+        .esp_free_heap_bytes = esp_get_free_heap_size(),
     };
-    uint8_t frame[64];
+    uint8_t frame[UGV_CRSF_DIAGNOSTIC_PAYLOAD_SIZE + 4u];
     const size_t size = ugv_crsf_build_diagnostic_frame(
         frame, sizeof(frame), &diagnostic);
+    return size > 0u && uart_write_bytes(RC_UART, frame, size) == (int)size;
+}
+
+static uint32_t positive_float_as_milli(float value)
+{
+    if (value <= 0.0f) return 0u;
+    const float scaled = value * 1000.0f;
+    return scaled >= (float)UINT32_MAX ? UINT32_MAX : (uint32_t)(scaled + 0.5f);
+}
+
+static int32_t signed_float_as_milli(float value)
+{
+    const double scaled = (double)value * 1000.0;
+    if (scaled >= (double)INT32_MAX) return INT32_MAX;
+    if (scaled <= (double)INT32_MIN) return INT32_MIN;
+    return (int32_t)(scaled + (scaled >= 0.0 ? 0.5 : -0.5));
+}
+
+static bool radio_send_bms(void)
+{
+    ugv_bms_state_t state;
+    if (!ugv_bms_ble_get_state(&state)) {
+        return false;
+    }
+    const bool valid = state.connected && state.last_frame_age_ms <= 10000u;
+    const ugv_crsf_bms_t bms = {
+        .flags = (state.connected ? UGV_CRSF_BMS_FLAG_CONNECTED : 0u) |
+                 (valid ? UGV_CRSF_BMS_FLAG_VALID : 0u),
+        .soc_pct = state.soc_pct,
+        .frame_age_ms = as_u16_saturated(state.last_frame_age_ms),
+        .pack_voltage_mv = positive_float_as_milli(state.pack_voltage_v),
+        .pack_current_ma = signed_float_as_milli(state.pack_current_a),
+        .remaining_capacity_mah = positive_float_as_milli(
+            state.remaining_capacity_ah),
+        .full_capacity_mah = positive_float_as_milli(state.full_capacity_ah),
+        .cycle_count = state.cycle_count,
+        .cell_mv_min = state.cell_mv_min,
+        .cell_mv_max = state.cell_mv_max,
+        .cell_mv_delta = state.cell_mv_delta,
+        .temp_low_c = state.temp_low_c,
+        .temp_high_c = state.temp_high_c,
+        .alarm_bits = state.alarm_bits,
+        .cell_mv = {state.cell_mv[0], state.cell_mv[1],
+                    state.cell_mv[2], state.cell_mv[3]},
+        .switch_flags =
+            (uint8_t)((state.charging_enabled ? UGV_CRSF_BMS_SWITCH_CHARGING : 0u) |
+                      (state.discharging_enabled ? UGV_CRSF_BMS_SWITCH_DISCHARGING : 0u) |
+                      (state.charger_plugged ? UGV_CRSF_BMS_SWITCH_CHARGER_PLUGGED : 0u) |
+                      ((state.balancer_status << UGV_CRSF_BMS_SWITCH_BALANCER_SHIFT) &
+                       UGV_CRSF_BMS_SWITCH_BALANCER_MASK)),
+    };
+    uint8_t frame[UGV_CRSF_BMS_PAYLOAD_SIZE + 4u];
+    const size_t size = ugv_crsf_build_bms_frame(frame, sizeof(frame), &bms);
     return size > 0u && uart_write_bytes(RC_UART, frame, size) == (int)size;
 }
 
@@ -273,6 +336,7 @@ void app_main(void)
     uint32_t last_control_ms = 0u;
     uint32_t last_rpm_radio_ms = 0u;
     uint32_t last_diagnostic_radio_ms = 0u;
+    uint32_t last_bms_radio_ms = 0u;
     unsigned rpm_radio_side = 0u;
     uint8_t rx[128];
     uint32_t update_button_pressed_ms = 0u;
@@ -346,6 +410,10 @@ void app_main(void)
             (void)radio_send_diagnostic(
                 &radio, &control, &left_link, &right_link,
                 &telemetry, current_ms);
+        }
+        if ((current_ms - last_bms_radio_ms) >= BMS_RADIO_PERIOD_MS) {
+            last_bms_radio_ms = current_ms;
+            (void)radio_send_bms();
         }
         vTaskDelay(1);
     }

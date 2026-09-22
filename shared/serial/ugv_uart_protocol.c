@@ -19,6 +19,20 @@ static uint16_t get_u16_le(const uint8_t *input)
     return (uint16_t)input[0] | ((uint16_t)input[1] << 8u);
 }
 
+static void put_u32_le(uint8_t *output, uint32_t value)
+{
+    output[0] = (uint8_t)value;
+    output[1] = (uint8_t)(value >> 8u);
+    output[2] = (uint8_t)(value >> 16u);
+    output[3] = (uint8_t)(value >> 24u);
+}
+
+static uint32_t get_u32_le(const uint8_t *input)
+{
+    return (uint32_t)input[0] | ((uint32_t)input[1] << 8u) |
+           ((uint32_t)input[2] << 16u) | ((uint32_t)input[3] << 24u);
+}
+
 uint16_t ugv_uart_crc16(const uint8_t *data, size_t size)
 {
     uint16_t crc = 0xFFFFu;
@@ -189,6 +203,8 @@ bool ugv_uart_encode_telemetry(uint8_t *payload, size_t size,
     put_u16_le(&payload[16], message->control_rx_count);
     payload[18] = message->last_control_flags;
     payload[19] = message->last_enabled_mask;
+    put_u32_le(&payload[20], message->uptime_ms);
+    put_u16_le(&payload[24], message->stack_free_bytes);
     return true;
 }
 
@@ -212,5 +228,7 @@ bool ugv_uart_decode_telemetry(ugv_uart_telemetry_t *message,
     message->control_rx_count = get_u16_le(&payload[16]);
     message->last_control_flags = payload[18];
     message->last_enabled_mask = payload[19];
+    message->uptime_ms = get_u32_le(&payload[20]);
+    message->stack_free_bytes = get_u16_le(&payload[24]);
     return true;
 }

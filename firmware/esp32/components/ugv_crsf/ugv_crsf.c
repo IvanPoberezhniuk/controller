@@ -56,6 +56,8 @@ static void encode_link_diagnostic(
     output[19] = (uint8_t)diagnostic->control_rx_count;
     output[20] = diagnostic->last_control_flags;
     output[21] = diagnostic->last_enabled_mask;
+    put_u32_le(&output[22], diagnostic->uptime_ms);
+    put_u16_le(&output[26], diagnostic->stack_free_bytes);
 }
 
 static void decode_channels(ugv_crsf_receiver_t *receiver,
@@ -255,8 +257,50 @@ size_t ugv_crsf_build_diagnostic_frame(
     put_u32_le(&payload[10], diagnostic->crsf_channel_frame_count);
     put_u16_le(&payload[14], diagnostic->crsf_crc_error_count);
     encode_link_diagnostic(&payload[16], &diagnostic->left);
-    encode_link_diagnostic(&payload[38], &diagnostic->right);
+    encode_link_diagnostic(&payload[44], &diagnostic->right);
+    put_u32_le(&payload[72], diagnostic->esp_uptime_ms);
+    put_u32_le(&payload[76], diagnostic->esp_free_heap_bytes);
     frame[frame_size - 1u] = crc8_dvb_s2(
         &frame[2], UGV_CRSF_DIAGNOSTIC_PAYLOAD_SIZE + 1u);
+    return frame_size;
+}
+
+size_t ugv_crsf_build_bms_frame(uint8_t *frame, size_t capacity,
+                                const ugv_crsf_bms_t *bms)
+{
+    const size_t frame_size = UGV_CRSF_BMS_PAYLOAD_SIZE + 4u;
+    if (frame == NULL || bms == NULL || capacity < frame_size) {
+        return 0u;
+    }
+
+    frame[0] = CRSF_SYNC;
+    frame[1] = UGV_CRSF_BMS_PAYLOAD_SIZE + 2u;
+    frame[2] = UGV_CRSF_BMS_FRAME_TYPE;
+    uint8_t *payload = &frame[3];
+    payload[0] = 'B';
+    payload[1] = 'M';
+    payload[2] = 'S';
+    payload[3] = UGV_CRSF_BMS_VERSION;
+    payload[4] = bms->flags;
+    payload[5] = bms->soc_pct;
+    put_u16_le(&payload[6], bms->frame_age_ms);
+    put_u32_le(&payload[8], bms->pack_voltage_mv);
+    put_u32_le(&payload[12], (uint32_t)bms->pack_current_ma);
+    put_u32_le(&payload[16], bms->remaining_capacity_mah);
+    put_u32_le(&payload[20], bms->full_capacity_mah);
+    put_u16_le(&payload[24], bms->cycle_count);
+    put_u16_le(&payload[26], bms->cell_mv_min);
+    put_u16_le(&payload[28], bms->cell_mv_max);
+    put_u16_le(&payload[30], bms->cell_mv_delta);
+    payload[32] = (uint8_t)bms->temp_low_c;
+    payload[33] = (uint8_t)bms->temp_high_c;
+    put_u32_le(&payload[34], bms->alarm_bits);
+    put_u16_le(&payload[38], bms->cell_mv[0]);
+    put_u16_le(&payload[40], bms->cell_mv[1]);
+    put_u16_le(&payload[42], bms->cell_mv[2]);
+    put_u16_le(&payload[44], bms->cell_mv[3]);
+    payload[46] = bms->switch_flags;
+    frame[frame_size - 1u] = crc8_dvb_s2(
+        &frame[2], UGV_CRSF_BMS_PAYLOAD_SIZE + 1u);
     return frame_size;
 }

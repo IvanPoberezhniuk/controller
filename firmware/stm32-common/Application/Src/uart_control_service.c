@@ -7,6 +7,7 @@
 #include "configuration.h"
 #include "motor_control.h"
 #include "safety.h"
+#include "stack_watermark.h"
 #ifdef UGV_OTA_APP
 #include "ugv_boot_request_stm32.h"
 #include "ugv_fw_update_protocol.h"
@@ -213,6 +214,8 @@ void uart_control_service_publish_telemetry(void)
         .control_rx_count = s_control_rx_count,
         .last_control_flags = s_last_control_flags,
         .last_enabled_mask = s_last_enabled_mask,
+        .uptime_ms = HAL_GetTick(),
+        .stack_free_bytes = stack_watermark_free_bytes(),
     };
     uint8_t payload[UGV_UART_TELEMETRY_PAYLOAD_SIZE];
     uint8_t frame[UGV_UART_MAX_FRAME_SIZE];

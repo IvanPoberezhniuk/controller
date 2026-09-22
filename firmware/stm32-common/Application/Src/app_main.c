@@ -7,6 +7,7 @@
 #include "fault_manager.h"
 #include "motor_control.h"
 #include "safety.h"
+#include "stack_watermark.h"
 #include "timebase.h"
 #include "uart_control_service.h"
 #include "watchdog.h"
@@ -17,6 +18,10 @@
 
 void app_main_init(void)
 {
+    /* Must run before any deeper call chain consumes stack, so the canary
+     * fill covers as much of the unused stack region as possible. */
+    stack_watermark_init();
+
     board_init();
     timebase_init();
     motor_control_init();

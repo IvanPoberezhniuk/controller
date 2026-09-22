@@ -20,6 +20,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/safety.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Application/Src/uart_control_service.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Src/board.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Src/stack_watermark.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Src/timebase.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Src/watchdog.c
     ${CMAKE_SOURCE_DIR}/shared/serial/ugv_uart_protocol.c

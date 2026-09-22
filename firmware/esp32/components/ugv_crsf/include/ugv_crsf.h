@@ -7,8 +7,11 @@
 
 #define UGV_CRSF_CHANNEL_COUNT 16u
 #define UGV_CRSF_DIAGNOSTIC_FRAME_TYPE 0x80u
-#define UGV_CRSF_DIAGNOSTIC_VERSION 2u
-#define UGV_CRSF_DIAGNOSTIC_PAYLOAD_SIZE 60u
+#define UGV_CRSF_DIAGNOSTIC_VERSION 3u
+#define UGV_CRSF_DIAGNOSTIC_PAYLOAD_SIZE 80u
+#define UGV_CRSF_BMS_FRAME_TYPE 0x81u
+#define UGV_CRSF_BMS_VERSION 2u
+#define UGV_CRSF_BMS_PAYLOAD_SIZE 47u
 
 enum {
     UGV_CRSF_DIAG_FLAG_RF_LINK = 1u << 0,
@@ -47,6 +50,8 @@ typedef struct {
     uint16_t control_rx_count;
     uint8_t last_control_flags;
     uint8_t last_enabled_mask;
+    uint32_t uptime_ms;
+    uint16_t stack_free_bytes;
 } ugv_crsf_link_diagnostic_t;
 
 typedef struct {
@@ -58,7 +63,44 @@ typedef struct {
     uint16_t crsf_crc_error_count;
     ugv_crsf_link_diagnostic_t left;
     ugv_crsf_link_diagnostic_t right;
+    uint32_t esp_uptime_ms;
+    uint32_t esp_free_heap_bytes;
 } ugv_crsf_diagnostic_t;
+
+enum {
+    UGV_CRSF_BMS_FLAG_CONNECTED = 1u << 0,
+    UGV_CRSF_BMS_FLAG_VALID = 1u << 1,
+};
+
+/* switch_flags bit layout: bit0 charging enabled, bit1 discharging enabled,
+ * bit2 charger plugged in, bits3-4 balancer status (0 off / 1 charging /
+ * 2 discharging balancer). */
+enum {
+    UGV_CRSF_BMS_SWITCH_CHARGING = 1u << 0,
+    UGV_CRSF_BMS_SWITCH_DISCHARGING = 1u << 1,
+    UGV_CRSF_BMS_SWITCH_CHARGER_PLUGGED = 1u << 2,
+    UGV_CRSF_BMS_SWITCH_BALANCER_SHIFT = 3u,
+    UGV_CRSF_BMS_SWITCH_BALANCER_MASK = 0x3u << UGV_CRSF_BMS_SWITCH_BALANCER_SHIFT,
+};
+
+typedef struct {
+    uint8_t flags;
+    uint8_t soc_pct;
+    uint16_t frame_age_ms;
+    uint32_t pack_voltage_mv;
+    int32_t pack_current_ma;
+    uint32_t remaining_capacity_mah;
+    uint32_t full_capacity_mah;
+    uint16_t cycle_count;
+    uint16_t cell_mv_min;
+    uint16_t cell_mv_max;
+    uint16_t cell_mv_delta;
+    int8_t temp_low_c;
+    int8_t temp_high_c;
+    uint32_t alarm_bits;
+    uint16_t cell_mv[4]; /* pack is confirmed 4S; per-cell voltage in arrival order */
+    uint8_t switch_flags; /* see UGV_CRSF_BMS_SWITCH_* */
+} ugv_crsf_bms_t;
 
 void ugv_crsf_init(ugv_crsf_receiver_t *receiver);
 ugv_crsf_event_t ugv_crsf_push_byte(ugv_crsf_receiver_t *receiver,
@@ -80,5 +122,9 @@ size_t ugv_crsf_build_rpm_frame(uint8_t *frame, size_t capacity,
  * for the desktop control station. All multi-byte fields are little-endian. */
 size_t ugv_crsf_build_diagnostic_frame(
     uint8_t *frame, size_t capacity, const ugv_crsf_diagnostic_t *diagnostic);
+
+/* Builds the private BMS telemetry frame (type 0x81, payload starts "BMS"). */
+size_t ugv_crsf_build_bms_frame(uint8_t *frame, size_t capacity,
+                                const ugv_crsf_bms_t *bms);
 
 #endif /* UGV_CRSF_H */

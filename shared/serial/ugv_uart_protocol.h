@@ -9,10 +9,10 @@
 #define UGV_UART_PROTOCOL_VERSION       1u
 #define UGV_UART_SYNC_0                 0xA5u
 #define UGV_UART_SYNC_1                 0x5Au
-#define UGV_UART_MAX_PAYLOAD_SIZE       20u
+#define UGV_UART_MAX_PAYLOAD_SIZE       26u
 #define UGV_UART_MAX_FRAME_SIZE         (2u + 4u + UGV_UART_MAX_PAYLOAD_SIZE + 2u)
 #define UGV_UART_CONTROL_PAYLOAD_SIZE   9u
-#define UGV_UART_TELEMETRY_PAYLOAD_SIZE 20u
+#define UGV_UART_TELEMETRY_PAYLOAD_SIZE 26u
 #define UGV_UART_COMMAND_PERIOD_MS      20u
 #define UGV_UART_COMMAND_TIMEOUT_MS     300u
 #define UGV_RC_LINK_TIMEOUT_MS          100u
@@ -65,6 +65,8 @@ typedef struct {
     uint16_t control_rx_count;
     uint8_t last_control_flags;
     uint8_t last_enabled_mask;
+    uint32_t uptime_ms;
+    uint16_t stack_free_bytes;
 } ugv_uart_telemetry_t;
 
 typedef struct {
