@@ -4,10 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* Minimal, practical telemetry set decoded from the JK-BD4A8S6P BMS.
- * Phase (a) of this component only establishes the BLE link and logs the
- * discovered GATT table; all fields below the `connected`/`last_frame_age_ms`
- * pair stay at zero until phase (b) adds JK frame parsing. */
+/* Minimal, practical telemetry set decoded from JK02 32S cell-info frames
+ * emitted by the JK-BD4A8S6P V15H/V15.41 BMS. */
 typedef struct {
     bool     connected;
     uint32_t last_frame_age_ms; /* UINT32_MAX if no frame has ever been decoded */
@@ -20,9 +18,14 @@ typedef struct {
     uint16_t cell_mv_min;
     uint16_t cell_mv_max;
     uint16_t cell_mv_delta;
+    uint16_t cell_mv[4]; /* pack is confirmed 4S; per-cell voltage in arrival order */
     int8_t   temp_high_c;
     int8_t   temp_low_c;
-    uint16_t alarm_bits;
+    uint32_t alarm_bits;
+    bool     charging_enabled;
+    bool     discharging_enabled;
+    bool     charger_plugged;
+    uint8_t  balancer_status; /* 0 = off, 1 = charging balancer, 2 = discharging balancer */
 } ugv_bms_state_t;
 
 /* Starts NVS + the NimBLE host, and a background task that connects to the
