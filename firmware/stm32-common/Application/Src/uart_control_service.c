@@ -73,8 +73,14 @@ static void handle_control(const ugv_uart_frame_t *frame)
     }
 
     if ((command.flags & UGV_UART_CONTROL_FLAG_CLEAR_FAULT) != 0u) {
-        set_all_targets_zero();
-        safety_set_motor_enable_mask(0u);
+        /* No set_all_targets_zero()/safety_set_motor_enable_mask(0) here,
+         * unlike ESTOP/disarm above: those force a stop unconditionally,
+         * but safety_clear_fault() is already a no-op outside DISABLED/
+         * DEGRADED/FAULT, and safety_update()'s own FAULT/DISABLED/
+         * EMERGENCY_STOP cases already disable motors when a stop is
+         * actually needed. Forcing it here too would zero a *healthy*,
+         * already-driving node's outputs just because CLEAR_FAULT was
+         * pressed -- it must be a true no-op when nothing is faulted. */
         safety_notify_command_received();
         safety_clear_fault();
         return;
