@@ -94,6 +94,7 @@ void ugv_manual_control_update(ugv_manual_control_t *control,
         control->armed = false;
         control->arm_low_seen = false;
         control->previous_arm_high = false;
+        control->clear_fault_requested = false;
         control->steering = 0.0f;
         control->throttle = 0.0f;
         stop_all_wheels(control);
@@ -117,6 +118,9 @@ void ugv_manual_control_update(ugv_manual_control_t *control,
     const float estop = ugv_crsf_channel_normalized(
         radio, UGV_RC_ESTOP_CHANNEL, 0.0f);
     const bool estop_high = estop > RC_ARM_HIGH_THRESHOLD;
+    const float clear_fault = ugv_crsf_channel_normalized(
+        radio, UGV_RC_CLEAR_FAULT_CHANNEL, 0.0f);
+    control->clear_fault_requested = clear_fault > RC_ARM_HIGH_THRESHOLD;
 
     if (estop_high) {
         control->emergency_stop_latched = true;

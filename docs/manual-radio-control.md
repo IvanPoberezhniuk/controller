@@ -35,6 +35,7 @@ telemetry TX. SN65HVD230 modules and CAN-H/CAN-L are not connected.
 | CH4 | Lights | reserved |
 | CH5 | ARM | low=disarm; neutral low-to-high edge=arm |
 | CH6 | ESTOP | high latches emergency stop |
+| CH7 | CLEAR_FAULT | high clears a latched STM32 FAULT; never arms by itself |
 
 The current mixer is:
 
@@ -75,6 +76,10 @@ again.
 
 - Bad CRC, wrong node role, malformed data, or out-of-range RPM is rejected.
 - A swapped Left/Right harness is rejected by the STM32 role check.
-- No valid command for 300 ms disables that node locally.
+- No valid command for 300 ms latches that node into `FAULT` (motors forced
+  off) if it was armed; reconnecting/re-arming from connectionApp does not
+  clear it. Raise CH7 (CLEAR_FAULT) to return the node to `DISABLED`, then
+  raise ARM again as usual. This is the expected result of restarting
+  connectionApp while armed, not a hardware failure.
 - CRSF loss disarms commands at ESP32 after 100 ms.
 - Reset of any controller begins disabled; previous targets are not restored.

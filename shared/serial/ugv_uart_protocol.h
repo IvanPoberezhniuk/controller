@@ -42,6 +42,7 @@ enum {
 enum {
     UGV_UART_CONTROL_FLAG_ARM = 1u << 0,
     UGV_UART_CONTROL_FLAG_ESTOP = 1u << 1,
+    UGV_UART_CONTROL_FLAG_CLEAR_FAULT = 1u << 2,
 };
 
 typedef struct {

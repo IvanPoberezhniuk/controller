@@ -13,6 +13,7 @@ enum {
     UGV_RC_DRIVE_MODE_CHANNEL = 2, /* CH3: 2WD / 4WD / 6WD */
     UGV_RC_ARM_CHANNEL = 4,      /* EdgeTX CH5 / two-position switch */
     UGV_RC_ESTOP_CHANNEL = 5,    /* EdgeTX CH6 / emergency stop */
+    UGV_RC_CLEAR_FAULT_CHANNEL = 6, /* EdgeTX CH7 / clears latched STM32 FAULT */
 };
 
 #define UGV_RC_MAX_RPM 200.0f
@@ -29,6 +30,7 @@ typedef struct {
     bool arm_low_seen;
     bool previous_arm_high;
     bool emergency_stop_latched;
+    bool clear_fault_requested;
     uint32_t last_channels_ms;
     uint32_t last_link_stats_ms;
     float steering;

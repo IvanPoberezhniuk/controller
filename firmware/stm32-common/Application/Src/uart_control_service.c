@@ -72,6 +72,14 @@ static void handle_control(const ugv_uart_frame_t *frame)
         return;
     }
 
+    if ((command.flags & UGV_UART_CONTROL_FLAG_CLEAR_FAULT) != 0u) {
+        set_all_targets_zero();
+        safety_set_motor_enable_mask(0u);
+        safety_notify_command_received();
+        safety_clear_fault();
+        return;
+    }
+
     if ((command.flags & UGV_UART_CONTROL_FLAG_ARM) == 0u) {
         set_all_targets_zero();
         safety_set_motor_enable_mask(0u);

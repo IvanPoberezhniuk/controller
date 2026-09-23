@@ -98,7 +98,9 @@ static bool motor_link_send(motor_link_t *link,
         .enabled_mask = control->armed ? enable_mask : 0u,
         .flags = (control->armed ? UGV_UART_CONTROL_FLAG_ARM : 0u) |
                  (control->emergency_stop_latched
-                      ? UGV_UART_CONTROL_FLAG_ESTOP : 0u),
+                      ? UGV_UART_CONTROL_FLAG_ESTOP : 0u) |
+                 (control->clear_fault_requested
+                      ? UGV_UART_CONTROL_FLAG_CLEAR_FAULT : 0u),
         .front_rpm = control->armed ? rpm[0] : 0,
         .center_rpm = control->armed ? rpm[1] : 0,
         .rear_rpm = control->armed ? rpm[2] : 0,
