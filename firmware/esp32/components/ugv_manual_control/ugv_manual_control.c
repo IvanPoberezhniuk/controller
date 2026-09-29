@@ -11,10 +11,11 @@
 
 static void mix_drive(ugv_manual_control_t *control)
 {
-    /* Match connectionApp's vehicle convention: positive steering accelerates
-     * the right side and slows/reverses the left side. */
-    float left = control->throttle - (control->steering * 0.5f);
-    float right = control->throttle + (control->steering * 0.5f);
+    /* Bench-confirmed: positive steering (stick/D-key right) must slow/reverse
+     * the right side and accelerate the left side so the vehicle pivots
+     * toward the commanded (right) side. */
+    float left = control->throttle + (control->steering * 0.5f);
+    float right = control->throttle - (control->steering * 0.5f);
     float largest = left < 0.0f ? -left : left;
     const float right_magnitude = right < 0.0f ? -right : right;
     if (right_magnitude > largest) {

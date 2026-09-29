@@ -56,13 +56,14 @@ static void test_explicit_neutral_arm_and_mixer(void)
         assert(control.right_rpm[wheel] == 200);
     }
 
-    /* Zero throttle plus full right steering performs a point turn. */
+    /* Zero throttle plus full right steering pivots toward the right: left
+     * side forward, right side reversed. */
     set_channel(&radio, UGV_RC_THROTTLE_CHANNEL, CRSF_CENTER);
     set_channel(&radio, UGV_RC_STEERING_CHANNEL, CRSF_MAX);
     fresh_update(&control, &radio, 4u);
     for (unsigned wheel = 0; wheel < 3u; ++wheel) {
-        assert(control.left_rpm[wheel] == -100);
-        assert(control.right_rpm[wheel] == 100);
+        assert(control.left_rpm[wheel] == 100);
+        assert(control.right_rpm[wheel] == -100);
     }
 }
 
