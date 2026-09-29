@@ -68,12 +68,18 @@ static void test_overcurrent_latches_while_disabled(void)
 
 static void test_stall_latches_until_clear(void)
 {
+    /* Stall detection now requires overcurrent, not merely "commanded but
+     * encoder sees no rotation" -- that trigger falsely latched wheels
+     * mid-turn when skid-steer scrub friction delayed the wheel actually
+     * starting to spin. A commanded, over-current motor should still
+     * latch and stay disabled until cleared. */
     reset_fixture();
     MotorState *motor = &s_motors[MOTOR_FRONT];
     motor->enabled = true;
     motor->target_rpm = 20.0f;
     motor->measured_rpm = 0.0f;
-    motor->pwm_command = 0.5f;
+    motor->current_valid = true;
+    motor->current_a = 11.0f;
 
     fault_manager_update();
     assert(!motor->stalled);
@@ -88,9 +94,29 @@ static void test_stall_latches_until_clear(void)
     assert(!motor->stalled);
 }
 
+static void test_no_rotation_alone_does_not_stall(void)
+{
+    /* A wheel that's slow to break static/scrub friction during a turn
+     * must not be latched off just because the encoder hasn't seen
+     * rotation yet -- only real overcurrent should trip the stall latch. */
+    reset_fixture();
+    MotorState *motor = &s_motors[MOTOR_FRONT];
+    motor->enabled = true;
+    motor->target_rpm = 20.0f;
+    motor->measured_rpm = 0.0f;
+    motor->pwm_command = 0.5f;
+
+    for (int i = 0; i < 10; i++) {
+        fault_manager_update();
+    }
+    assert(!motor->stalled);
+    assert(motor->enabled);
+}
+
 int main(void)
 {
     test_overcurrent_latches_while_disabled();
     test_stall_latches_until_clear();
+    test_no_rotation_alone_does_not_stall();
     return 0;
 }

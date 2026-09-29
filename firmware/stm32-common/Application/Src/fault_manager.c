@@ -3,9 +3,8 @@
 #include "configuration.h"
 #include "timebase.h"
 
-/* Algorithm-internal epsilons, not deployment tunables. */
+/* Algorithm-internal epsilon, not a deployment tunable. */
 #define STALL_TARGET_RPM_MIN    5.0f
-#define STALL_MEASURED_RPM_MAX  2.0f
 
 static uint32_t s_stall_ticks[UGV_MOTOR_COUNT];
 
@@ -30,18 +29,23 @@ void fault_manager_update(void)
             continue;
         }
 
-        float target_mag   = (st->target_rpm < 0.0f) ? -st->target_rpm : st->target_rpm;
-        float measured_mag = (st->measured_rpm < 0.0f) ? -st->measured_rpm : st->measured_rpm;
-        float pwm_mag       = (st->pwm_command < 0.0f) ? -st->pwm_command : st->pwm_command;
+        float target_mag = (st->target_rpm < 0.0f) ? -st->target_rpm : st->target_rpm;
 
         if (st->current_valid && st->current_a > cfg->stall_current_threshold_a) {
             st->overcurrent = true;
         }
 
+        /* No-rotation-under-PWM trigger removed: skid-steer turns can
+         * legitimately take a wheel longer than the stall window to break
+         * static scrub friction against the floor, which was falsely
+         * latching wheels mid-turn. Bench-measured stall current for these
+         * motors is ~3.6 A (see ugv-drivetrain notes), far below what this
+         * PSU can sustain indefinitely, so overcurrent alone -- once
+         * cfg->stall_current_threshold_a is tuned to a real value -- is
+         * sufficient protection here.
+         */
         bool driving_but_not_turning =
-            (target_mag > STALL_TARGET_RPM_MIN) &&
-            (pwm_mag > cfg->pwm_min_effective || st->overcurrent) &&
-            (measured_mag < STALL_MEASURED_RPM_MAX);
+            (target_mag > STALL_TARGET_RPM_MIN) && st->overcurrent;
 
         if (driving_but_not_turning) {
             if (s_stall_ticks[m] < stall_ticks_threshold) {
