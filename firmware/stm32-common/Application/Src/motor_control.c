@@ -206,6 +206,14 @@ static void step_one(motor_index_t motor, float dt_s)
          * clear the integral rather than let stale windup fight that. */
         st->pid_integral = 0.0f;
         st->previous_error = 0.0f;
+
+        if (commanded_direction == 0) {
+            /* Motor is genuinely idle, not mid-reversal: forget which way it
+             * was last driven so the next command (e.g. a pivot turn after
+             * stopping) isn't mistaken for an instant polarity flip at speed
+             * and forced through an unnecessary coast delay. */
+            in->last_direction = 0;
+        }
     }
 
     float pid_out = mm_pid_step(st->target_rpm, st->measured_rpm, dt_s,
