@@ -126,6 +126,11 @@ static void test_rpm_telemetry_frame(void)
 
 static void test_diagnostic_frame(void)
 {
+    /* Diagnostic frame is version UGV_CRSF_DIAGNOSTIC_VERSION (3): 4-byte
+     * CRSF header, 16-byte control preamble, two 28-byte link-diagnostic
+     * blocks (left/right), 8 bytes of ESP32 uptime/heap, 1-byte CRC --
+     * see ugv_crsf.c's ugv_crsf_build_diagnostic_frame/encode_link_diagnostic
+     * for the authoritative layout this test mirrors. */
     const ugv_crsf_diagnostic_t diagnostic = {
         .flags = UGV_CRSF_DIAG_FLAG_RF_LINK | UGV_CRSF_DIAG_FLAG_ARMED,
         .drive_mode = 3u,
@@ -146,30 +151,54 @@ static void test_diagnostic_frame(void)
             .control_rx_count = 0x1234u,
             .last_control_flags = 0x01u,
             .last_enabled_mask = 0x07u,
+            .uptime_ms = 123456u,
+            .stack_free_bytes = 512u,
         },
         .right = {
             .control_tx_count = 2000u,
             .telemetry_age_ms = UINT16_MAX,
         },
     };
-    uint8_t frame[64] = {0};
+    uint8_t frame[UGV_CRSF_DIAGNOSTIC_PAYLOAD_SIZE + 4u] = {0};
     const size_t size = ugv_crsf_build_diagnostic_frame(
         frame, sizeof(frame), &diagnostic);
-    assert(size == 64u);
+    assert(size == UGV_CRSF_DIAGNOSTIC_PAYLOAD_SIZE + 4u);
     assert(frame[0] == 0xc8u);
-    assert(frame[1] == 62u);
+    assert(frame[1] == UGV_CRSF_DIAGNOSTIC_PAYLOAD_SIZE + 2u);
     assert(frame[2] == UGV_CRSF_DIAGNOSTIC_FRAME_TYPE);
-    assert(memcmp(&frame[3], "UGV\x02", 4u) == 0);
+    assert(memcmp(&frame[3], "UGV\x03", 4u) == 0);
     assert(frame[7] == diagnostic.flags);
     assert(frame[8] == diagnostic.drive_mode);
-    assert(frame[9] == 0x83u && frame[10] == 0xffu);
-    assert(frame[13] == 0x78u && frame[16] == 0x12u);
-    assert(frame[19] == 0xe8u && frame[22] == 0u);
-    assert(frame[38] == 0x34u);
-    assert(frame[39] == 0x01u);
-    assert(frame[40] == 0x07u);
-    assert(frame[63] == crc8_dvb_s2(&frame[2], 61u));
-    assert(ugv_crsf_build_diagnostic_frame(frame, 63u, &diagnostic) == 0u);
+    assert(frame[9] == 0x83u && frame[10] == 0xffu);  /* throttle -125, LE */
+    assert(frame[11] == 0xfau && frame[12] == 0x00u); /* steering 250, LE */
+    assert(frame[13] == 0x78u && frame[16] == 0x12u); /* channel_frame_count, LE */
+    assert(frame[17] == 9u && frame[18] == 0u);       /* crc_error_count, LE */
+
+    /* Left link-diagnostic block starts at frame[19]. */
+    assert(frame[19] == 0xe8u && frame[20] == 0x03u); /* control_tx_count=1000 */
+    assert(frame[23] == 2u && frame[24] == 0u);       /* control_tx_fail_count */
+    assert(frame[25] == 0x5au && frame[26] == 0u);    /* telemetry_rx_count=90 */
+    assert(frame[29] == 25u && frame[30] == 0u);      /* telemetry_age_ms */
+    assert(frame[31] == 3u && frame[32] == 0u);       /* uart_crc_error_count */
+    assert(frame[33] == 4u && frame[34] == 0u);       /* uart_format_error_count */
+    assert(frame[35] == 4u);                          /* safety_state */
+    assert(frame[36] == 0x02u);                       /* fault_mask */
+    assert(frame[37] == 0x77u);                       /* valid_mask */
+    assert(frame[38] == 0x34u);                       /* control_rx_count truncated to u8 */
+    assert(frame[39] == 0x01u);                       /* last_control_flags */
+    assert(frame[40] == 0x07u);                       /* last_enabled_mask */
+    assert(frame[41] == 0x40u && frame[42] == 0xe2u &&
+           frame[43] == 0x01u && frame[44] == 0u);    /* uptime_ms=123456, LE */
+    assert(frame[45] == 0u && frame[46] == 2u);       /* stack_free_bytes=512, LE */
+
+    /* Right link-diagnostic block starts at frame[47]; only two fields set,
+     * the rest are zero-initialized. */
+    assert(frame[47] == 0xd0u && frame[48] == 0x07u); /* control_tx_count=2000 */
+    assert(frame[57] == 0xffu && frame[58] == 0xffu); /* telemetry_age_ms=never seen */
+
+    assert(frame[sizeof(frame) - 1u] ==
+           crc8_dvb_s2(&frame[2], UGV_CRSF_DIAGNOSTIC_PAYLOAD_SIZE + 1u));
+    assert(ugv_crsf_build_diagnostic_frame(frame, sizeof(frame) - 1u, &diagnostic) == 0u);
 }
 
 int main(void)
