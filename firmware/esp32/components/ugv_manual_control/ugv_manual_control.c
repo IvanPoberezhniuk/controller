@@ -14,20 +14,6 @@ static void mix_drive(ugv_manual_control_t *control)
     /* Bench-confirmed: positive steering (stick/D-key right) must slow/reverse
      * the right side and accelerate the left side so the vehicle pivots
      * toward the commanded (right) side. */
-    float left = control->throttle + (control->steering * 0.5f);
-    float right = control->throttle - (control->steering * 0.5f);
-    float largest = left < 0.0f ? -left : left;
-    const float right_magnitude = right < 0.0f ? -right : right;
-    if (right_magnitude > largest) {
-        largest = right_magnitude;
-    }
-    if (largest > 1.0f) {
-        left /= largest;
-        right /= largest;
-    }
-    const int16_t left_rpm = (int16_t)(left * UGV_RC_MAX_RPM);
-    const int16_t right_rpm = (int16_t)(right * UGV_RC_MAX_RPM);
-
     control->left_enable_mask = UGV_WHEEL_ENABLE_REAR;
     if (control->drive_mode >= UGV_DRIVE_MODE_4WD) {
         control->left_enable_mask |= UGV_WHEEL_ENABLE_CENTER;
@@ -37,10 +23,33 @@ static void mix_drive(ugv_manual_control_t *control)
     }
     control->right_enable_mask = control->left_enable_mask;
 
+    /* Center-pivot mode concentrates the required lateral slip at the
+     * center axle so front/rear wheels roll at plain throttle during a
+     * turn, reducing scrub on long-wheelbase 6WD turns. All-wheel mode
+     * (default/safe) steers every active wheel identically. */
+    const bool center_pivot_only =
+        control->turn_mode == UGV_TURN_MODE_CENTER_PIVOT;
+
     for (unsigned wheel = 0; wheel < UGV_MANUAL_CONTROL_WHEEL_COUNT; ++wheel) {
         const bool enabled = (control->left_enable_mask & (1u << wheel)) != 0u;
-        control->left_rpm[wheel] = enabled ? left_rpm : 0;
-        control->right_rpm[wheel] = enabled ? right_rpm : 0;
+        const bool apply_steering =
+            !center_pivot_only || wheel == UGV_WHEEL_INDEX_CENTER;
+        const float steer_term = apply_steering ? control->steering * 0.5f : 0.0f;
+
+        float left = control->throttle + steer_term;
+        float right = control->throttle - steer_term;
+        float largest = left < 0.0f ? -left : left;
+        const float right_magnitude = right < 0.0f ? -right : right;
+        if (right_magnitude > largest) {
+            largest = right_magnitude;
+        }
+        if (largest > 1.0f) {
+            left /= largest;
+            right /= largest;
+        }
+
+        control->left_rpm[wheel] = enabled ? (int16_t)(left * UGV_RC_MAX_RPM) : 0;
+        control->right_rpm[wheel] = enabled ? (int16_t)(right * UGV_RC_MAX_RPM) : 0;
     }
 }
 
@@ -111,6 +120,10 @@ void ugv_manual_control_update(ugv_manual_control_t *control,
         radio, UGV_RC_DRIVE_MODE_CHANNEL, 0.0f);
     control->drive_mode = drive_mode < -0.5f ? UGV_DRIVE_MODE_2WD :
                           drive_mode > 0.5f ? UGV_DRIVE_MODE_6WD : UGV_DRIVE_MODE_4WD;
+    const float turn_mode = ugv_crsf_channel_normalized(
+        radio, UGV_RC_TURN_MODE_CHANNEL, 0.0f);
+    control->turn_mode = turn_mode > 0.5f ? UGV_TURN_MODE_CENTER_PIVOT
+                                           : UGV_TURN_MODE_ALL_WHEEL;
 
     const float arm = ugv_crsf_channel_normalized(
         radio, UGV_RC_ARM_CHANNEL, 0.0f);

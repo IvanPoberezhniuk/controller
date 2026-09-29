@@ -105,6 +105,41 @@ static void test_drive_modes_control_each_wheel(void)
     assert(control.right_enable_mask == UGV_WHEEL_ENABLE_ALL);
 }
 
+static void test_turn_mode_center_pivot_only_steers_center_wheel(void)
+{
+    ugv_crsf_receiver_t radio;
+    ugv_crsf_init(&radio);
+    ugv_manual_control_t control;
+    ugv_manual_control_init(&control);
+
+    set_channel(&radio, UGV_RC_ARM_CHANNEL, CRSF_MIN);
+    fresh_update(&control, &radio, 0u);
+    set_channel(&radio, UGV_RC_ARM_CHANNEL, CRSF_MAX);
+    fresh_update(&control, &radio, 1u);
+
+    set_channel(&radio, UGV_RC_DRIVE_MODE_CHANNEL, CRSF_MAX); /* 6WD: all wheels enabled */
+    set_channel(&radio, UGV_RC_THROTTLE_CHANNEL, CRSF_CENTER);
+    set_channel(&radio, UGV_RC_STEERING_CHANNEL, CRSF_MAX);
+    set_channel(&radio, UGV_RC_TURN_MODE_CHANNEL, CRSF_MAX); /* center-pivot */
+    fresh_update(&control, &radio, 2u);
+
+    assert(control.turn_mode == UGV_TURN_MODE_CENTER_PIVOT);
+    /* Front (0) and rear (2) roll at plain throttle -- zero here since
+     * throttle is centered -- while the center wheel (1) still pivots. */
+    assert(control.left_rpm[0] == 0 && control.right_rpm[0] == 0);
+    assert(control.left_rpm[1] == 100 && control.right_rpm[1] == -100);
+    assert(control.left_rpm[2] == 0 && control.right_rpm[2] == 0);
+
+    /* Switching back to all-wheel steers every wheel identically again. */
+    set_channel(&radio, UGV_RC_TURN_MODE_CHANNEL, CRSF_MIN);
+    fresh_update(&control, &radio, 3u);
+    assert(control.turn_mode == UGV_TURN_MODE_ALL_WHEEL);
+    for (unsigned wheel = 0; wheel < 3u; ++wheel) {
+        assert(control.left_rpm[wheel] == 100);
+        assert(control.right_rpm[wheel] == -100);
+    }
+}
+
 static void test_failsafe_requires_rearm(void)
 {
     ugv_crsf_receiver_t radio;
@@ -192,6 +227,7 @@ int main(void)
 {
     test_explicit_neutral_arm_and_mixer();
     test_drive_modes_control_each_wheel();
+    test_turn_mode_center_pivot_only_steers_center_wheel();
     test_failsafe_requires_rearm();
     test_non_neutral_arm_is_rejected();
     test_estop_latches_until_explicit_rearm();

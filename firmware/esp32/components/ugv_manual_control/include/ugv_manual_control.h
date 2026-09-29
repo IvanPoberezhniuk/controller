@@ -14,15 +14,25 @@ enum {
     UGV_RC_ARM_CHANNEL = 4,      /* EdgeTX CH5 / two-position switch */
     UGV_RC_ESTOP_CHANNEL = 5,    /* EdgeTX CH6 / emergency stop */
     UGV_RC_CLEAR_FAULT_CHANNEL = 6, /* EdgeTX CH7 / clears latched STM32 FAULT */
+    UGV_RC_TURN_MODE_CHANNEL = 7, /* CH8: all-wheel / center-pivot steer */
 };
 
 #define UGV_RC_MAX_RPM 200.0f
+
+/* Wheel index within left_rpm[]/right_rpm[]/enable masks: 0=front, 1=center,
+ * 2=rear (matches UGV_WHEEL_ENABLE_FRONT/CENTER/REAR bit order). */
+#define UGV_WHEEL_INDEX_CENTER 1u
 
 typedef enum {
     UGV_DRIVE_MODE_2WD = 1u,
     UGV_DRIVE_MODE_4WD = 2u,
     UGV_DRIVE_MODE_6WD = 3u,
 } ugv_drive_mode_t;
+
+typedef enum {
+    UGV_TURN_MODE_ALL_WHEEL = 1u,   /* every active wheel steers (default) */
+    UGV_TURN_MODE_CENTER_PIVOT = 2u, /* only the center axle steers */
+} ugv_turn_mode_t;
 
 typedef struct {
     bool link_up;
@@ -36,6 +46,7 @@ typedef struct {
     float steering;
     float throttle;
     uint8_t drive_mode;
+    uint8_t turn_mode;
     uint8_t left_enable_mask;
     uint8_t right_enable_mask;
     int16_t left_rpm[3];
